@@ -3,8 +3,8 @@
 # priors give a segmentation, a distribution, an optional phase reference, and optional
 # per-site overrides. Note: unicode parameter names (μ, σ) must be QUOTED TOML keys.
 
-# frcal is a TOP-LEVEL key: it must appear before the first [section] header, or TOML
-# nests it under that section and it is ignored.
+# frcal is a TOP-LEVEL key: it must appear before the first [section] header. Placed after
+# one, TOML nests it under that section, and the config check rejects it as an unknown key.
 frcal = false      # false -> g*d*r (jnofr); true -> adjoint(r)*g*d*r
 
 [gain]
@@ -17,12 +17,8 @@ scheme = "leakage_simple"   # d1re, d1im, d2re, d2im
 [priors.lg1]
 seg = "integ"
 dist = { dist = "Normal", args = [0.0, 0.4] }
-  [priors.lg1.overrides.LM]
-  seg = "integ"
-  dist = { dist = "Normal", args = [0.0, 2.0] }
-  [priors.lg1.overrides.SM]
-  seg = "integ"
-  dist = { dist = "Normal", args = [0.0, 0.5] }
+overrides.LM = { seg = "integ", dist = { dist = "Normal", args = [0.0, 2.0] } }
+overrides.SM = { seg = "integ", dist = { dist = "Normal", args = [0.0, 0.5] } }
 
 [priors.lgrat]
 seg = "integ"
@@ -51,9 +47,7 @@ refant = { kind = "SEFD", val = 0.0 }
 seg = "integ"
 phase = true
 dist = { dist = "DiagonalVonMises", args = [0.0, 0.1] }
-  [priors.gprat.overrides.SM]
-  seg = "integ"
-  dist = { dist = "DiagonalVonMises", args = [0.0, 0.5] }
+overrides.SM = { seg = "integ", dist = { dist = "DiagonalVonMises", args = [0.0, 0.5] } }
 
 [priors."gpratμ"]
 seg = "track"
@@ -63,27 +57,19 @@ dist = { dist = "DiagonalVonMises", args = [0.0, 3.141592653589793] }
 [priors.d1re]
 seg = "track"
 dist = { dist = "Normal", args = [0.0, 0.2] }
-  [priors.d1re.overrides.AA]
-  seg = "track"
-  dist = { dist = "Normal", args = [0.0, 0.01] }
+overrides.AA = { seg = "track", dist = { dist = "Normal", args = [0.0, 0.01] } }
 
 [priors.d1im]
 seg = "track"
 dist = { dist = "Normal", args = [0.0, 0.2] }
-  [priors.d1im.overrides.AA]
-  seg = "track"
-  dist = { dist = "Normal", args = [0.0, 0.01] }
+overrides.AA = { seg = "track", dist = { dist = "Normal", args = [0.0, 0.01] } }
 
 [priors.d2re]
 seg = "track"
 dist = { dist = "Normal", args = [0.0, 0.2] }
-  [priors.d2re.overrides.AA]
-  seg = "track"
-  dist = { dist = "Normal", args = [0.0, 0.01] }
+overrides.AA = { seg = "track", dist = { dist = "Normal", args = [0.0, 0.01] } }
 
 [priors.d2im]
 seg = "track"
 dist = { dist = "Normal", args = [0.0, 0.2] }
-  [priors.d2im.overrides.AA]
-  seg = "track"
-  dist = { dist = "Normal", args = [0.0, 0.01] }
+overrides.AA = { seg = "track", dist = { dist = "Normal", args = [0.0, 0.01] } }

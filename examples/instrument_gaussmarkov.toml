@@ -41,10 +41,7 @@ scheme = "leakage_simple"   # d1re, d1im, d2re, d2im
 kind = "gaussmarkov"
 seg = "integ"
 process = { kind = "OrnsteinUhlenbeck", sigma = { dist = "Exponential", args = [0.4] }, tau = { dist = "InverseGamma", args = [3.0, 6.0] } }
-  [priors.lg1.overrides.LM]
-  kind = "iid"
-  seg = "integ"
-  dist = { dist = "Normal", args = [0.0, 2.0] }
+overrides.LM = { kind = "iid", seg = "integ", dist = { dist = "Normal", args = [0.0, 2.0] } }
 
 # Log gain-ratio as an OU process with FIXED hyperparameters (sigma = 1, tau = 2 hr).
 [priors.lgrat]
