@@ -382,4 +382,3 @@ function support_basis(post::VLBIPosterior, cut::Real)
         return Ω
     end
 end
-

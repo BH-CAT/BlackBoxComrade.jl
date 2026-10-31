@@ -101,8 +101,10 @@ function _residual_figure(post, params_list)
     # Re/Im colour key.
     CairoMakie.Legend(
         fig[nprod + 1, 1],
-        [CairoMakie.MarkerElement(color = _RE_COL, marker = :circle),
-            CairoMakie.MarkerElement(color = _IM_COL, marker = :circle)],
+        [
+            CairoMakie.MarkerElement(color = _RE_COL, marker = :circle),
+            CairoMakie.MarkerElement(color = _IM_COL, marker = :circle),
+        ],
         ["Real", "Imag"]; orientation = :horizontal, framevisible = false
     )
     return fig

@@ -41,7 +41,7 @@ function _parse_corr_polbasis(entries)
             mapping = Pair{Any, Any}[
                 _parse_corr_polbasis_feed(source, source, i) =>
                     _parse_corr_polbasis_feed(entry[source], source, i)
-                for source in source_labels
+                    for source in source_labels
             ]
             length(unique(last.(mapping))) == 2 || error("corr_polbasis[$i] target feeds must be distinct")
             push!(corrections, (; site = Symbol(entry["site"]), mapping))

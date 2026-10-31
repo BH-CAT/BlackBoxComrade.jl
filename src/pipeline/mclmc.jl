@@ -97,8 +97,8 @@ function sample_mclmc(out, post, xopt, strategy::FittingStrategy, rng; starts = 
     restart_rngs = host_rngs(K)
 
     moves = isempty(strategy.moves) ? nothing : build_moves(
-        post_cpu, strategy.moves, xopt; space, output = joinpath(mkpath(out), "moves.jls")
-    )
+            post_cpu, strategy.moves, xopt; space, output = joinpath(mkpath(out), "moves.jls")
+        )
     function move_chains(chains, phase, step, total)
         Θh = Array(chains.state.θ)
         moved = false

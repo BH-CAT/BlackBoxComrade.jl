@@ -129,11 +129,13 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         pf = parse_process(Dict("kind" => "OrnsteinUhlenbeck", "sigma" => 0.1, "tau" => 2.0))
         @test pf isa OrnsteinUhlenbeck
         @test isempty(Comrade.hyperprior(pf))            # all fixed -> no fitted hyperparams
-        pfit = parse_process(Dict(
-            "kind" => "ou",
-            "sigma" => Dict("dist" => "Exponential", "args" => [0.1]),
-            "tau" => Dict("dist" => "InverseGamma", "args" => [3.0, 6.0]),
-        ))
+        pfit = parse_process(
+            Dict(
+                "kind" => "ou",
+                "sigma" => Dict("dist" => "Exponential", "args" => [0.1]),
+                "tau" => Dict("dist" => "InverseGamma", "args" => [3.0, 6.0]),
+            )
+        )
         @test keys(Comrade.hyperprior(pfit)) == (:σ, :τ)
         @test_throws ErrorException parse_process(Dict("kind" => "Nope", "sigma" => 1.0, "tau" => 1.0))
         @test_throws ErrorException parse_process(Dict("kind" => "ou", "tau" => 1.0))       # missing sigma
@@ -208,10 +210,12 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                 "sigma" => Dict{String, Any}("dist" => "Exponential", "args" => [0.4]),
                 "tau" => 2.0,
             ),
-            "overrides" => Dict{String, Any}("SM" => Dict{String, Any}(
-                "kind" => "iid", "seg" => "integ",
-                "dist" => Dict{String, Any}("dist" => "Normal", "args" => [0.0, 0.5]),
-            )),
+            "overrides" => Dict{String, Any}(
+                "SM" => Dict{String, Any}(
+                    "kind" => "iid", "seg" => "integ",
+                    "dist" => Dict{String, Any}("dist" => "Normal", "args" => [0.0, 0.5]),
+                )
+            ),
         )
         cfg["priors"]["lgrat"] = Dict{String, Any}(
             "kind" => "gaussmarkov", "seg" => "scan", "centered" => true,
@@ -278,11 +282,13 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
             "kind" => "gaussmarkov", "seg" => "integ",
             "process" => Dict{String, Any}("kind" => "WrappedBrownian", "tau" => 20.0),
             "init" => Dict{String, Any}("kind" => "fixed", "value" => 0.0),
-            "overrides" => Dict{String, Any}("SM" => Dict{String, Any}(
-                "kind" => "gaussmarkov", "seg" => "integ",
-                "process" => Dict{String, Any}("kind" => "wb", "tau" => 2.0e4),
-                "init" => Dict{String, Any}("kind" => "fixed", "value" => 0.0),
-            )),
+            "overrides" => Dict{String, Any}(
+                "SM" => Dict{String, Any}(
+                    "kind" => "gaussmarkov", "seg" => "integ",
+                    "process" => Dict{String, Any}("kind" => "wb", "tau" => 2.0e4),
+                    "init" => Dict{String, Any}("kind" => "fixed", "value" => 0.0),
+                )
+            ),
         )
         @test build_instrument_config(cfgw) isa InstrumentModel
 
@@ -377,20 +383,28 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
     end
 
     @testset "polarization-basis corrections" begin
-        flags = parse_flagtable(Dict{String, Any}("corr_polbasis" => Any[
-            Dict("site" => "AA", "R" => "Y", "L" => "X"),
-            Dict("site" => "LM", "X" => "L", "Y" => "R"),
-            "HAY",
-        ]))
+        flags = parse_flagtable(
+            Dict{String, Any}(
+                "corr_polbasis" => Any[
+                    Dict("site" => "AA", "R" => "Y", "L" => "X"),
+                    Dict("site" => "LM", "X" => "L", "Y" => "R"),
+                    "HAY",
+                ]
+            )
+        )
         @test flags.corr_polbasis[1] == (; site = :AA, mapping = Pair{Any, Any}[RPol() => YPol(), LPol() => XPol()])
         @test flags.corr_polbasis[2] == (; site = :LM, mapping = Pair{Any, Any}[XPol() => LPol(), YPol() => RPol()])
         @test flags.corr_polbasis[3] == (; site = :HAY, mapping = Pair{Any, Any}[RPol() => YPol(), LPol() => XPol()])
         # `corpol` (the per-feed relabeler) is internal; only `corr_polbasis` is exported
         @test BlackBoxComrade.corpol(RPol(), flags.corr_polbasis[1].mapping) == YPol()
         @test_throws ErrorException BlackBoxComrade.corpol(XPol(), flags.corr_polbasis[1].mapping)
-        @test_throws ErrorException parse_flagtable(Dict("corr_polbasis" => Any[
-            Dict("site" => "AA", "R" => "Y", "L" => "linear"),
-        ]))
+        @test_throws ErrorException parse_flagtable(
+            Dict(
+                "corr_polbasis" => Any[
+                    Dict("site" => "AA", "R" => "Y", "L" => "linear"),
+                ]
+            )
+        )
     end
 
     @testset "restart resumes only a started sampler" begin
@@ -450,7 +464,8 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         @test (ms4[2].params, ms4[2].rounds, ms4[2].target_accept, ms4[2].initial_scale) == (["fwhm"], 10, 0.3, 0.02)
         @test (ms4[3].rounds, ms4[3].target_accept, ms4[3].initial_scale) == (1, 0.45, nothing)
         # the tables parse from TOML as written in the docs
-        toml = TOML.parse("""
+        toml = TOML.parse(
+            """
             [sampler]
             [[sampler.moves]]
             kind = "field_scale"
@@ -464,7 +479,8 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
             params = ["b"]
             [run]
             use_reactant = true
-            """)
+            """
+        )
         @test [m.kind for m in build_fitting_config(toml).moves] == ["field_scale", "rho_field", "pnc_field", "pnc_orbit"]
         @test build_fitting_config(toml).diagonal == "none"
         toml["sampler"]["diagonal"] = "nutpie"
@@ -1128,10 +1144,12 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         end
         @test err !== nothing
         @test !occursin("unknown", lowercase(sprint(showerror, err)))
-        @test_throws ErrorException build_data_config(Dict{String, Any}(
-            "paths" => Dict{String, Any}("file" => "x.uvfits", "path_mode" => "cwd"),
-            "data" => Dict{String, Any}("conjugat" => true),
-        ))
+        @test_throws ErrorException build_data_config(
+            Dict{String, Any}(
+                "paths" => Dict{String, Any}("file" => "x.uvfits", "path_mode" => "cwd"),
+                "data" => Dict{String, Any}("conjugat" => true),
+            )
+        )
 
         # End-to-end on a mixed-feed, opposite-convention file when it is available locally.
         domfile = "/mnt/ptiede/Research/EHT2026/data/DomData/calibration/2026-03-13/calibrated_M87_Jy.uvfits"

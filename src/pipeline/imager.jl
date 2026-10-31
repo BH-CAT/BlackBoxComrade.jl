@@ -56,7 +56,7 @@ function _run_reactant_benchmarks(post, transport_method)
     println()
     # median seconds per value+gradient: the leapfrog unit cost, used by the sampling
     # callbacks to convert wall time per draw into leapfrogs (and thus tree depth)
-    return median(brev.times) * 1e-9
+    return median(brev.times) * 1.0e-9
 end
 
 """
@@ -338,9 +338,9 @@ function _sample_reactant(out, post, xopt, strategy, restart, gimg, imgbase, tra
         "(sky-field modes up to $(strategy.precond_band_limit) × the longest baseline)"
     adaptor = _metric_adaptor(strategy, curvature; rows, basis)
     moves = isempty(strategy.moves) ? nothing : build_moves(
-        post_cpu, strategy.moves, xopt;
-        space = latent_space(strategy), output = joinpath(mkpath(out), "moves.jls")
-    )
+            post_cpu, strategy.moves, xopt;
+            space = latent_space(strategy), output = joinpath(mkpath(out), "moves.jls")
+        )
     isnothing(moves) || @info "Moves between NUTS chunks (proposals per call): " *
         join(("$(Comrade.move_name(m)) ×$r" for (m, r) in zip(moves.moves, moves.rounds)), ", ")
     smplr = Comrade.ReactantNUTS(;

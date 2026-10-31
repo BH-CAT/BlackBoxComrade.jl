@@ -15,7 +15,7 @@ const REACTANT_JLL_UUID = "0192cb87-2b54-54ad-80e0-3be72ad8a3c0"
 # `--no-gpu` is sticky: once written it stays in LocalPreferences.toml until `--gpu` clears it.
 function gpu_mode()
     disable = any(a -> a in ("--no-gpu", "--cpu"), ARGS) ||
-              lowercase(get(ENV, "BLACKBOX_NO_GPU", "")) in ("1", "true", "yes", "on")
+        lowercase(get(ENV, "BLACKBOX_NO_GPU", "")) in ("1", "true", "yes", "on")
     reset = any(a -> a in ("--gpu", "--enable-gpu"), ARGS)
     disable && reset && error("Conflicting flags: pass either --no-gpu/--cpu or --gpu, not both.")
     disable && return :disable
@@ -26,9 +26,9 @@ end
 # Read/update the active environment's LocalPreferences.toml, preserving everything else.
 function update_reactant_pref!(mode::Symbol)
     prefs_path = joinpath(dirname(Base.active_project()), "LocalPreferences.toml")
-    prefs = isfile(prefs_path) ? TOML.parsefile(prefs_path) : Dict{String,Any}()
-    if mode === :disable
-        section = get!(() -> Dict{String,Any}(), prefs, "Reactant_jll")
+    prefs = isfile(prefs_path) ? TOML.parsefile(prefs_path) : Dict{String, Any}()
+    return if mode === :disable
+        section = get!(() -> Dict{String, Any}(), prefs, "Reactant_jll")
         section["gpu"] = "none"
         open(io -> TOML.print(io, prefs), prefs_path, "w")
         @info "GPU support disabled: set Reactant_jll gpu=\"none\" in $prefs_path"
