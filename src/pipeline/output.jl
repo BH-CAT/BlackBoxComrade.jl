@@ -220,7 +220,7 @@ end
     load_chain_and_post(file, nsamples=:; warmup=false) -> (chain, post)
 
 Reload a saved chain and its posterior (see [`load_posterior`](@ref)). The chains of an MCLMC
-run, `<file>/chain_k`, load as one set of draws (see [`load_mclmc_chains`](@ref)), with
+run, `<file>/chain_k`, load as draws × chains (see [`load_mclmc_chains`](@ref)), with
 `nsamples` selecting draws of each chain.
 
 `warmup=true` loads the warmup (adaptation) chain from `<file>/warmup` instead of the

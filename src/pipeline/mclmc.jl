@@ -58,8 +58,9 @@ chain, must pass `KineticSamplers.check_energy`. Sampling then keeps the last po
 of `strategy.nsample` blocks per chain, chain `k` written as a Comrade sample directory
 `out/chain_k`. The moves of `strategy` run on every chain every $(MCLMC_MOVE_BLOCKS) blocks of
 the warmup's adaptation phase and of sampling; a chain that moved restarts with a fresh
-velocity. Returns about $(MCLMC_RETURNED_DRAWS) draws, evenly thinned from each chain; the
-chains on disk keep every draw (see [`load_mclmc_chains`](@ref)).
+velocity. Returns about $(MCLMC_RETURNED_DRAWS) draws, evenly thinned from each chain, as a
+draws × chains `PosteriorSamples`; the chains on disk keep every draw (see
+[`load_mclmc_chains`](@ref)).
 """
 function sample_mclmc(out, post, xopt, strategy::FittingStrategy, rng; starts = nothing)
     K = strategy.chains
@@ -191,14 +192,17 @@ end
     load_mclmc_chains(out, nsamples=:) -> Comrade.PosteriorSamples
 
 The draws of the chains `out/chain_1`, `out/chain_2`, … of an MCLMC run (see
-[`sample_mclmc`](@ref)), concatenated in chain order, with `nsamples` selecting draws of each
-chain.
+[`sample_mclmc`](@ref)) as a draws × chains `PosteriorSamples`, with `nsamples` selecting
+draws of each chain.
 """
 function load_mclmc_chains(out, nsamples = Base.Colon())
     per_chain = [Comrade.load_samples(dir, nsamples) for dir in _mclmc_chain_dirs(out)]
+    lengths = length.(per_chain)
+    allequal(lengths) || error(
+        "the MCLMC chains in $out have different numbers of draws, $lengths; pass `nsamples` to select the same draws of each"
+    )
     return Comrade.PosteriorSamples(
-        reduce(vcat, Comrade.postsamples.(per_chain)),
-        reduce(vcat, Comrade.samplerstats.(per_chain));
+        hcat(Comrade.postsamples.(per_chain)...), hcat(Comrade.samplerstats.(per_chain)...);
         metadata = Dict(:sampler => :MCLMC, :chains => length(per_chain))
     )
 end
