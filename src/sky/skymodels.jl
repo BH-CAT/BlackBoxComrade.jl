@@ -75,7 +75,7 @@ end
     power_centroid(img, p)
 
 The `Iᵖ`-weighted centroid of an intensity map, in the coordinates of its grid. `p = 1` is the
-center of light, [`centroid`](@ref); a larger `p` weights the bright pixels more heavily, so
+center of light, `centroid`; a larger `p` weights the bright pixels more heavily, so
 the result follows the compact structure and is nearly blind to faint extended flux. Polarized
 maps use Stokes `I`.
 """

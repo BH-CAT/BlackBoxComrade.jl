@@ -34,7 +34,7 @@ default). Sections:
   only; `true` reads the RR/LL/RL/LR slots as circular for every station regardless of the
   antenna table, see [`force_circular_feed_labels!`](@ref); declare linear stations with
   `[flags] corr_polbasis` instead).
-- `[flags]` — the flag-table keys consumed by [`parse_flagtable`](@ref), including
+- `[flags]` — the flag-table keys consumed by `parse_flagtable`, including
   `drop_tranges` (UT-hour windows to remove). `keep_trange` selects; `drop_tranges` removes.
 """
 function build_data_config(

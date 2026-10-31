@@ -208,7 +208,7 @@ end
 """
     PNCAdaptation(moves, post, θ0, steps; target = 0.65)
 
-A `between_chunks` hook that runs the [`Comrade.MoveSet`](@ref) `moves`, whose PNC moves were
+A `between_chunks` hook that runs the `Comrade.MoveSet` `moves`, whose PNC moves were
 built at the constrained point `θ0` of `post`, and adapts them during warmup:
 
   - it keeps the mean raw Stokes I image of the draws it sees, and at each warmup step in

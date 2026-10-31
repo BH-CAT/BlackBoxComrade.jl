@@ -39,7 +39,7 @@ jobs:
       - name: Allow cloning the private KineticSamplers
         run: |
           test -n "$TOKEN" || { echo "::error::secret KINETICSAMPLERS_TOKEN is not set"; exit 1; }
-          git config --global url."https://x-access-token:${TOKEN}@github.com/BlackHolesEH/KineticSamplers.jl".insteadOf "https://github.com/BlackHolesEH/KineticSamplers.jl"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/BlackHolesEh/KineticSamplers.jl".insteadOf "https://github.com/BlackHolesEh/KineticSamplers.jl"
         env:
           TOKEN: ${{ secrets.KINETICSAMPLERS_TOKEN }}
       - uses: julia-actions/setup-julia@v3
@@ -67,7 +67,7 @@ jobs:
       - name: Allow cloning the private KineticSamplers
         run: |
           test -n "$TOKEN" || { echo "::error::secret KINETICSAMPLERS_TOKEN is not set"; exit 1; }
-          git config --global url."https://x-access-token:${TOKEN}@github.com/BlackHolesEH/KineticSamplers.jl".insteadOf "https://github.com/BlackHolesEH/KineticSamplers.jl"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/BlackHolesEh/KineticSamplers.jl".insteadOf "https://github.com/BlackHolesEh/KineticSamplers.jl"
         env:
           TOKEN: ${{ secrets.KINETICSAMPLERS_TOKEN }}
       - uses: julia-actions/setup-julia@v3

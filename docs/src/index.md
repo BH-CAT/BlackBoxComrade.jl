@@ -4,7 +4,7 @@ CurrentModule = BlackBoxComrade
 
 # BlackBoxComrade
 
-Documentation for [BlackBoxComrade](https://github.com/BlackHolesEH/BlackBoxComrade.jl).
+Documentation for [BlackBoxComrade](https://github.com/BlackHolesEh/BlackBoxComrade.jl).
 
 ```@index
 ```

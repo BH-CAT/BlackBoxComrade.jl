@@ -2,8 +2,8 @@
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://blackholeseh.github.io/BlackBoxComrade.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://blackholeseh.github.io/BlackBoxComrade.jl/dev/)
-[![Build Status](https://github.com/BlackHolesEH/BlackBoxComrade.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/BlackHolesEH/BlackBoxComrade.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Coverage](https://codecov.io/gh/BlackHolesEH/BlackBoxComrade.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/BlackHolesEH/BlackBoxComrade.jl)
+[![Build Status](https://github.com/BlackHolesEh/BlackBoxComrade.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/BlackHolesEh/BlackBoxComrade.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![Coverage](https://codecov.io/gh/BlackHolesEh/BlackBoxComrade.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/BlackHolesEh/BlackBoxComrade.jl)
 
 BlackBoxComrade is a Bayesian VLBI imaging pipeline built on
 [Comrade.jl](https://github.com/ptiede/Comrade.jl). Comrade provides the instrument model,
@@ -23,7 +23,7 @@ A run is described by **four TOML config files**:
    flag table.
 4. **fitting** — optimizer, the noise-tempering schedule, and the MCMC sampler
    (AdvancedHMC NUTS, Reactant NUTS, or multi-chain MCLMC from
-   [KineticSamplers.jl](https://github.com/BlackHolesEH/KineticSamplers.jl)).
+   [KineticSamplers.jl](https://github.com/BlackHolesEh/KineticSamplers.jl)).
 
 See [`examples/`](examples) for annotated configs.
 
@@ -33,7 +33,7 @@ The package provides the `bbcomrade` [app](https://pkgdocs.julialang.org/v1/apps
 Install it once, with `~/.julia/bin` on your `PATH`:
 
 ```julia-repl
-pkg> app add https://github.com/BlackHolesEH/BlackBoxComrade.jl
+pkg> app add https://github.com/BlackHolesEh/BlackBoxComrade.jl
 ```
 
 (`pkg> app develop path/to/BlackBoxComrade` for a local checkout). Then

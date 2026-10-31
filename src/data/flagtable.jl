@@ -80,7 +80,7 @@ end
 """
     read_flagtable(path::String) -> NamedTuple
 
-Parse a standalone flag-table TOML file. See [`parse_flagtable`](@ref) for the schema.
+Parse a standalone flag-table TOML file. See `parse_flagtable` for the schema.
 """
 function read_flagtable(path::String)
     return parse_flagtable(TOML.parsefile(path))

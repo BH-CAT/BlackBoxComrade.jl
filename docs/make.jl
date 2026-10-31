@@ -18,6 +18,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo = "github.com/BlackHolesEH/BlackBoxComrade.jl",
+    repo = "github.com/BlackHolesEh/BlackBoxComrade.jl",
     devbranch = "main",
 )
