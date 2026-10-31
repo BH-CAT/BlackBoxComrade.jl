@@ -1,11 +1,11 @@
-# BlackBoxVLBIImaging
+# BlackBoxComrade
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://ptiede.github.io/BlackBoxVLBIImaging.jl/stable/)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://ptiede.github.io/BlackBoxVLBIImaging.jl/dev/)
-[![Build Status](https://github.com/ptiede/BlackBoxVLBIImaging.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/ptiede/BlackBoxVLBIImaging.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Coverage](https://codecov.io/gh/ptiede/BlackBoxVLBIImaging.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/ptiede/BlackBoxVLBIImaging.jl)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://ptiede.github.io/BlackBoxComrade.jl/stable/)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://ptiede.github.io/BlackBoxComrade.jl/dev/)
+[![Build Status](https://github.com/ptiede/BlackBoxComrade.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/ptiede/BlackBoxComrade.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![Coverage](https://codecov.io/gh/ptiede/BlackBoxComrade.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/ptiede/BlackBoxComrade.jl)
 
-BlackBoxVLBIImaging is a Bayesian VLBI imaging pipeline built on
+BlackBoxComrade is a Bayesian VLBI imaging pipeline built on
 [Comrade.jl](https://github.com/ptiede/Comrade.jl). Comrade provides the instrument model,
 the posterior and the sampler interfaces, with sky models from its companion packages
 [VLBISkyModels.jl](https://github.com/EHTJulia/VLBISkyModels.jl) and
@@ -29,8 +29,17 @@ See [`examples/`](examples) for annotated configs.
 
 ## Running
 
+The package provides the `bbcomrade` [app](https://pkgdocs.julialang.org/v1/apps/) (Julia ≥ 1.12).
+Install it once, with `~/.julia/bin` on your `PATH`:
+
+```julia-repl
+pkg> app add https://github.com/ptiede/BlackBoxComrade.jl
+```
+
+(`pkg> app develop path/to/BlackBoxComrade` for a local checkout). Then
+
 ```bash
-julia --project=drivers -t auto drivers/main.jl \
+bbcomrade --threads=4 -- \
     --image examples/image.toml \
     --instrument examples/instrument_mixed.toml \
     --data examples/data.toml \
@@ -38,12 +47,16 @@ julia --project=drivers -t auto drivers/main.jl \
     --outpath runs/m87
 ```
 
+Julia flags such as `--threads` go before `--`, the app's options after it; `bbcomrade --help`
+lists the options. The same command line runs without installing the app as
+`julia --project=drivers -t 4 drivers/main.jl --image ...`.
+
 Sampling on Reactant NUTS is selected inside the fitting TOML (`use_reactant = true`,
 `sampler = "reactant"`), since that choice also governs the optimizer path. To resume a
 previous run from its serialized optimum, add the one-off `--restart`:
 
 ```bash
-julia --project=drivers -t auto drivers/main.jl --restart \
+bbcomrade --threads=4 -- --restart \
     --image examples/image.toml \
     --instrument examples/instrument_mixed.toml \
     --data examples/data.toml \
@@ -58,7 +71,7 @@ of posterior image draws under `images/`.
 ## Using as a library
 
 ```julia
-using BlackBoxVLBIImaging, TOML
+using BlackBoxComrade, TOML
 skym, imgdata = build_sky_config(TOML.parsefile("examples/image.toml"))
 intm          = build_instrument_config(TOML.parsefile("examples/instrument_mixed.toml"))
 dcoh          = build_data_config(TOML.parsefile("examples/data.toml"))

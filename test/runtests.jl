@@ -1,4 +1,4 @@
-using BlackBoxVLBIImaging
+using BlackBoxComrade
 using Test
 using TOML
 using Random
@@ -10,18 +10,18 @@ import Enzyme
 const EXDIR = normpath(joinpath(@__DIR__, "..", "examples"))
 exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
-@testset "BlackBoxVLBIImaging.jl" begin
+@testset "BlackBoxComrade.jl" begin
 
     @testset "a draw with non-finite parameters is an error" begin
         good = (sky = (σa = 1.0, ρa = (2.0, 3.0), a = ones(2, 2)), instrument = (lg = [0.1, 0.2],))
-        @test BlackBoxVLBIImaging._check_finite_draw(good, "warmup step 10") === good
+        @test BlackBoxComrade._check_finite_draw(good, "warmup step 10") === good
         bad = (sky = (σa = 1.0, σd = Inf, ρa = (2.0, NaN), a = [1.0 -Inf; 0.0 1.0]), instrument = (lg = [0.1, 0.2],))
-        @test BlackBoxVLBIImaging._nonfinite_paths(bad) == [".sky.σd = Inf", ".sky.ρa[2] = NaN", ".sky.a (1 of 4 entries, e.g. -Inf)"]
-        @test_throws "the warmup step 140 draw has non-finite parameters: .sky.σd = Inf" BlackBoxVLBIImaging._check_finite_draw(bad, "warmup step 140")
+        @test BlackBoxComrade._nonfinite_paths(bad) == [".sky.σd = Inf", ".sky.ρa[2] = NaN", ".sky.a (1 of 4 entries, e.g. -Inf)"]
+        @test_throws "the warmup step 140 draw has non-finite parameters: .sky.σd = Inf" BlackBoxComrade._check_finite_draw(bad, "warmup step 140")
     end
 
     @testset "NUTS depth estimate from the kernel time" begin
-        dn = BlackBoxVLBIImaging._depth_note
+        dn = BlackBoxComrade._depth_note
         # 8 s over 10 draws of 1 ms gradients
         @test dn(8.0, 10, 1.0e-3) == " ~lf/step=800 (depth≈9.6)"
         @test dn(8.0, 10, nothing) == ""
@@ -40,12 +40,12 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         @test occursin("Truncated", string(typeof(d)))
         @test parse_dist(Dict("dist" => "DiagonalVonMises", "args" => [0.0, 3.14159])) isa DiagonalVonMises
         @test parse_dist(Dict("dist" => "AngularProjectedNormal", "args" => [0.0, 0.0808])) isa
-            BlackBoxVLBIImaging.PT.AngularProjectedNormal
+            BlackBoxComrade.PT.AngularProjectedNormal
         @test parse_dist(Dict("dist" => "WrappedNormal", "args" => [0.0, 2.44])) isa
-            BlackBoxVLBIImaging.PT.WrappedNormal
+            BlackBoxComrade.PT.WrappedNormal
         # a bounded LogNormal is the truncated log-normal
         dln = parse_dist(Dict("dist" => "LogNormal", "args" => [2.66, 0.764], "upper" => 48.0))
-        ref = BlackBoxVLBIImaging.Distributions.truncated(LogNormal(2.66, 0.764); upper = 48.0)
+        ref = BlackBoxComrade.Distributions.truncated(LogNormal(2.66, 0.764); upper = 48.0)
         @test logpdf(dln, 20.0) - logpdf(ref, 20.0) ≈ logpdf(dln, 3.0) - logpdf(ref, 3.0) atol = 1.0e-12
         @test_throws ErrorException parse_dist(Dict("dist" => "Nonsense", "args" => [1.0]))
         @test_throws ErrorException parse_dist(Dict("args" => [1.0]))               # missing 'dist'
@@ -54,20 +54,20 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
     @testset "scheme registry" begin
         # required params are probed from the @instrument definitions themselves
-        for (k, ctor) in BlackBoxVLBIImaging.GAIN_SCHEMES
-            @test !isempty(BlackBoxVLBIImaging.required_params(ctor))
+        for (k, ctor) in BlackBoxComrade.GAIN_SCHEMES
+            @test !isempty(BlackBoxComrade.required_params(ctor))
         end
-        @test BlackBoxVLBIImaging.required_params(BlackBoxVLBIImaging.LEAKAGE_SCHEMES["none"]) == ()
-        @test BlackBoxVLBIImaging.required_params(BlackBoxVLBIImaging.GAIN_SCHEMES["gain"]) ==
+        @test BlackBoxComrade.required_params(BlackBoxComrade.LEAKAGE_SCHEMES["none"]) == ()
+        @test BlackBoxComrade.required_params(BlackBoxComrade.GAIN_SCHEMES["gain"]) ==
             (:lg1, :gp1, :lgratμ, :lgratσ, :lgrat, :gprat, :gpratμ)
-        @test BlackBoxVLBIImaging.required_params(BlackBoxVLBIImaging.LEAKAGE_SCHEMES["leakage_simple"]) ==
+        @test BlackBoxComrade.required_params(BlackBoxComrade.LEAKAGE_SCHEMES["leakage_simple"]) ==
             (:d1re, :d1im, :d2re, :d2im)
-        @test BlackBoxVLBIImaging.required_params(BlackBoxVLBIImaging.LEAKAGE_SCHEMES["leakage_disk"]) ==
+        @test BlackBoxComrade.required_params(BlackBoxComrade.LEAKAGE_SCHEMES["leakage_disk"]) ==
             (:d1re, :d1im, :d2re, :d2im)
-        @test BlackBoxVLBIImaging.unitdisk(0.0 + 0.0im) == 0
-        @test abs(BlackBoxVLBIImaging.unitdisk(0.2 + 0.0im)) ≈ 0.2 / sqrt(1.04)
-        @test all(z -> abs(BlackBoxVLBIImaging.unitdisk(z)) < 1, (3.0 + 4.0im, -1.0e3im, 30.0 + 0.0im))
-        @test BlackBoxVLBIImaging.required_params(BlackBoxVLBIImaging.GAIN_SCHEMES["gain_offsetphase"]) ==
+        @test BlackBoxComrade.unitdisk(0.0 + 0.0im) == 0
+        @test abs(BlackBoxComrade.unitdisk(0.2 + 0.0im)) ≈ 0.2 / sqrt(1.04)
+        @test all(z -> abs(BlackBoxComrade.unitdisk(z)) < 1, (3.0 + 4.0im, -1.0e3im, 30.0 + 0.0im))
+        @test BlackBoxComrade.required_params(BlackBoxComrade.GAIN_SCHEMES["gain_offsetphase"]) ==
             (:lg1, :gp1μ, :gp1, :lgratμ, :lgrat, :gpratμ, :gprat)
     end
 
@@ -85,7 +85,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
     end
 
     @testset "self-calibrated station phase" begin
-        @test BlackBoxVLBIImaging.required_params(BlackBoxVLBIImaging.GAIN_SCHEMES["gain_selfcal"]) ==
+        @test BlackBoxComrade.required_params(BlackBoxComrade.GAIN_SCHEMES["gain_selfcal"]) ==
             (:lg1, :lgratμ, :lgrat, :gpratμ, :gprat)
         cfg = exconfig("instrument_mixed.toml")
         cfg["gain"]["scheme"] = "gain_selfcal"
@@ -98,7 +98,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
     @testset "iid first-stamp pin (init)" begin
         vm = Dict{String, Any}("dist" => "DiagonalVonMises", "args" => [0.0, 3.14159])
-        sp = BlackBoxVLBIImaging._site_prior(
+        sp = BlackBoxComrade._site_prior(
             Dict{String, Any}(
                 "seg" => "integ", "dist" => vm,
                 "init" => Dict{String, Any}("kind" => "fixed", "value" => 0.0),
@@ -108,12 +108,12 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         @test sp.init == FixedInit(0.0)
         # no init -> nothing (the default, back-compatible path)
         @test isnothing(
-            BlackBoxVLBIImaging._site_prior(
+            BlackBoxComrade._site_prior(
                 Dict{String, Any}("seg" => "integ", "dist" => vm), "test"
             ).init
         )
         # only a fixed pin is meaningful for iid
-        @test_throws ErrorException BlackBoxVLBIImaging._site_prior(
+        @test_throws ErrorException BlackBoxComrade._site_prior(
             Dict{String, Any}(
                 "seg" => "integ", "dist" => vm,
                 "init" => Dict{String, Any}("kind" => "uniform"),
@@ -221,25 +221,25 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
         # refant kinds: Multi names several sites, for a parameter carrying more than one
         # gauge freedom
-        @test BlackBoxVLBIImaging._parse_refant(nothing) === NoReference()
-        @test BlackBoxVLBIImaging._parse_refant(Dict{String, Any}("kind" => "SEFD", "val" => 0.0)) isa
+        @test BlackBoxComrade._parse_refant(nothing) === NoReference()
+        @test BlackBoxComrade._parse_refant(Dict{String, Any}("kind" => "SEFD", "val" => 0.0)) isa
             SEFDReference
-        @test BlackBoxVLBIImaging._parse_refant(
+        @test BlackBoxComrade._parse_refant(
             Dict{String, Any}("kind" => "Single", "site" => "AA", "val" => 0.0)
         ) isa SingleReference
-        rm = BlackBoxVLBIImaging._parse_refant(
+        rm = BlackBoxComrade._parse_refant(
             Dict{String, Any}("kind" => "Multi", "sites" => ["AA", "LM"], "val" => 0.0)
         )
         @test rm isa MultiReference
         @test rm.sites == [:AA, :LM]
         @test rm.value == 0.0
-        @test_throws "requires a 'sites' list" BlackBoxVLBIImaging._parse_refant(
+        @test_throws "requires a 'sites' list" BlackBoxComrade._parse_refant(
             Dict{String, Any}("kind" => "Multi")
         )
-        @test_throws "'sites' to be a list" BlackBoxVLBIImaging._parse_refant(
+        @test_throws "'sites' to be a list" BlackBoxComrade._parse_refant(
             Dict{String, Any}("kind" => "Multi", "sites" => "AA")
         )
-        @test_throws "None, SEFD, Single, Multi" BlackBoxVLBIImaging._parse_refant(
+        @test_throws "None, SEFD, Single, Multi" BlackBoxComrade._parse_refant(
             Dict{String, Any}("kind" => "Manny", "sites" => ["AA"])
         )
         cfgm = exconfig("instrument_mixed.toml")
@@ -302,12 +302,12 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         imv = build_instrument_config(cfgv)
         @test imv isa InstrumentModel
         let d = imv.prior.gprat.default_dist
-            @test d.process isa BlackBoxVLBIImaging.Comrade.VonMisesProcess
-            @test d.param isa BlackBoxVLBIImaging.Comrade.NonCentered
+            @test d.process isa BlackBoxComrade.Comrade.VonMisesProcess
+            @test d.param isa BlackBoxComrade.Comrade.NonCentered
         end
         cfgv["priors"]["gprat"]["centered"] = true
         @test build_instrument_config(cfgv).prior.gprat.default_dist.param isa
-            BlackBoxVLBIImaging.Comrade.Centered
+            BlackBoxComrade.Comrade.Centered
         # ... while the shortest-arc process rejects the non-centered shorthand
         cfgv["priors"]["gprat"]["centered"] = false
         cfgv["priors"]["gprat"]["process"]["kind"] = "wou"
@@ -386,8 +386,8 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         @test flags.corr_polbasis[2] == (; site = :LM, mapping = Pair{Any, Any}[XPol() => LPol(), YPol() => RPol()])
         @test flags.corr_polbasis[3] == (; site = :HAY, mapping = Pair{Any, Any}[RPol() => YPol(), LPol() => XPol()])
         # `corpol` (the per-feed relabeler) is internal; only `corr_polbasis` is exported
-        @test BlackBoxVLBIImaging.corpol(RPol(), flags.corr_polbasis[1].mapping) == YPol()
-        @test_throws ErrorException BlackBoxVLBIImaging.corpol(XPol(), flags.corr_polbasis[1].mapping)
+        @test BlackBoxComrade.corpol(RPol(), flags.corr_polbasis[1].mapping) == YPol()
+        @test_throws ErrorException BlackBoxComrade.corpol(XPol(), flags.corr_polbasis[1].mapping)
         @test_throws ErrorException parse_flagtable(Dict("corr_polbasis" => Any[
             Dict("site" => "AA", "R" => "Y", "L" => "linear"),
         ]))
@@ -395,16 +395,16 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
     @testset "restart resumes only a started sampler" begin
         out = mktempdir()
-        @test !BlackBoxVLBIImaging._resume_sampler(out, false)
-        @test !BlackBoxVLBIImaging._resume_sampler(out, true)
-        @test !BlackBoxVLBIImaging._resume_sampler(joinpath(out, "missing"), true)
+        @test !BlackBoxComrade._resume_sampler(out, false)
+        @test !BlackBoxComrade._resume_sampler(out, true)
+        @test !BlackBoxComrade._resume_sampler(joinpath(out, "missing"), true)
         touch(joinpath(out, "gradient_time.jls"))
-        @test !BlackBoxVLBIImaging._resume_sampler(out, true)
+        @test !BlackBoxComrade._resume_sampler(out, true)
         mkpath(joinpath(out, "samples")); touch(joinpath(out, "samples", "output_scan_1.jls"))
-        @test_throws "holds samples but no transport.jls" BlackBoxVLBIImaging._resume_sampler(out, true)
+        @test_throws "holds samples but no transport.jls" BlackBoxComrade._resume_sampler(out, true)
         touch(joinpath(out, "transport.jls"))
-        @test BlackBoxVLBIImaging._resume_sampler(out, true)
-        @test !BlackBoxVLBIImaging._resume_sampler(out, false)
+        @test BlackBoxComrade._resume_sampler(out, true)
+        @test !BlackBoxComrade._resume_sampler(out, false)
     end
 
     @testset "fitting config" begin
@@ -503,11 +503,11 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         @test_throws "needs the Reactant sampler" build_fitting_config(cfg4)
 
         @test s.latent_space == "flat"
-        @test isnothing(BlackBoxVLBIImaging.latent_space(s))
+        @test isnothing(BlackBoxComrade.latent_space(s))
         cfg5 = exconfig("fitting.toml")
         cfg5["run"]["latent_space"] = "stdnormal"
         s5 = build_fitting_config(cfg5)
-        @test BlackBoxVLBIImaging.latent_space(s5) isa BlackBoxVLBIImaging.PT.StdNormal
+        @test BlackBoxComrade.latent_space(s5) isa BlackBoxComrade.PT.StdNormal
         cfg5["run"]["use_reactant"] = true
         foreach(k -> delete!(cfg5["sampler"], k), ("target_accept", "init_buffer", "term_buffer"))
         cfg5["run"]["latent_space"] = "cube"
@@ -539,27 +539,27 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
         cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan")
         @test build_fitting_config(cfg5).precond_refit_schedule == "stan"
-        @test BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5)).carry === :none
+        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).carry === :none
         cfg5["precondition"]["refit_carry"] = "rescale"
-        ad = BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5))
+        ad = BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5))
         @test ad isa Comrade.FisherLowRank && ad.carry === :rescale
         cfg5["precondition"]["refit_carry"] = "keep"
         @test_throws "set precondition.seed_transport" build_fitting_config(cfg5)
         cfg5["precondition"]["seed_transport"] = "t.jls"
-        @test BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5)).carry === :keep
+        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).carry === :keep
         cfg5["precondition"]["refit_carry"] = "yes"
         @test_throws "precondition.refit_carry must be" build_fitting_config(cfg5)
         # a limit on wide directions in Fisher refits
         cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "max_wide" => 20)
-        @test BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5)).max_wide == 20
+        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).max_wide == 20
         delete!(cfg5["precondition"], "max_wide")
-        @test isnothing(BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5)).max_wide)
+        @test isnothing(BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).max_wide)
         cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan")
-        @test BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5)).discard == 0.5
+        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).discard == 0.5
         cfg5["precondition"]["discard"] = 0.0
-        @test BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5)).discard == 0.0
+        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).discard == 0.0
         cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "rank_holdout" => 0.25, "rank_tol" => 0.1)
-        hd = BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5))
+        hd = BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5))
         @test hd.holdout == 0.25 && hd.rank_tol == 0.1
         cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "rank_tol" => 0.1)
         @test_throws "rank_tol needs precondition.rank_holdout" build_fitting_config(cfg5)
@@ -568,16 +568,16 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         cfg5["precondition"] = Dict{String, Any}("rank_holdout" => 0.25)
         @test_throws "rank_holdout applies to in-run refits" build_fitting_config(cfg5)
         cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "record_every" => 4)
-        @test BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5)).record_every == 4
+        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).record_every == 4
         delete!(cfg5["precondition"], "record_every")
-        @test BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5)).record_every ==
+        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).record_every ==
             Comrade.FisherLowRank().record_every
         cfg5["precondition"] = Dict{String, Any}("record_every" => 4)
         @test_throws "record_every applies to in-run refits" build_fitting_config(cfg5)
         cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "stiff_core" => true)
-        @test BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5)).stiff isa Comrade.StiffCore
+        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).stiff isa Comrade.StiffCore
         cfg5["precondition"]["stiff_core"] = false
-        @test isnothing(BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5)).stiff)
+        @test isnothing(BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).stiff)
         cfg5["precondition"] = Dict{String, Any}("stiff_core" => true)
         @test_throws "stiff_core applies to in-run refits" build_fitting_config(cfg5)
         cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "refit_kind" => "gauss_newton", "rank" => 600, "stiff_core" => true)
@@ -597,15 +597,15 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         @test_throws "max_wide applies to Fisher refits" build_fitting_config(cfg5)
         # fixed directions for Fisher refits
         fixedpath = joinpath(mktempdir(), "fixed.jls")
-        BlackBoxVLBIImaging.Serialization.serialize(fixedpath, (; directions = [1.0 0.0; 0.0 1.0; 0.0 0.0], sd = [3.0, 2.0]))
+        BlackBoxComrade.Serialization.serialize(fixedpath, (; directions = [1.0 0.0; 0.0 1.0; 0.0 0.0], sd = [3.0, 2.0]))
         cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "fixed_directions" => fixedpath)
-        fad = BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5))
+        fad = BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5))
         @test fad.fixed == ([1.0 0.0; 0.0 1.0; 0.0 0.0], [3.0, 2.0])
         cfg5["precondition"]["refit_carry"] = "rescale"
         @test_throws "fixed_directions needs refit_carry = \"none\"" build_fitting_config(cfg5)
         delete!(cfg5["precondition"], "refit_carry")
-        BlackBoxVLBIImaging.Serialization.serialize(fixedpath, [1.0, 0.0])
-        @test_throws "must hold a NamedTuple (; directions, sd)" BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5))
+        BlackBoxComrade.Serialization.serialize(fixedpath, [1.0, 0.0])
+        @test_throws "must hold a NamedTuple (; directions, sd)" BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5))
         cfg5["precondition"] = Dict{String, Any}(
             "refit_schedule" => "stan", "refit_kind" => "gauss_newton", "rank" => 600, "fixed_directions" => fixedpath
         )
@@ -617,31 +617,31 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         sg = build_fitting_config(cfg5)
         @test (sg.precond_refit_kind, sg.precond_rank, sg.precond_threshold, sg.precond_oversample) == ("gauss_newton", 600, 50.0, 10)
         H(x, W) = W
-        ga = BlackBoxVLBIImaging._metric_adaptor(sg, H)
+        ga = BlackBoxComrade._metric_adaptor(sg, H)
         @test ga isa Comrade.GaussNewtonLowRank && ga.curvature === H && ga.probes_per_draw == 610 && ga.schedule === :stan
         cfg5["precondition"]["probes_per_draw"] = 70
-        @test BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5), H).probes_per_draw == 70
+        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5), H).probes_per_draw == 70
         @test build_fitting_config(cfg5).precond_band_limit == 3.0
-        @test BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cfg5), H; rows = [1, 4, 9]).rows == [1, 4, 9]
+        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5), H; rows = [1, 4, 9]).rows == [1, 4, 9]
         cfg5["precondition"]["band_limit"] = Inf
         @test build_fitting_config(cfg5).precond_band_limit == Inf
         cfg5["precondition"]["band_limit"] = 0.0
         @test_throws "band_limit must be a positive multiple" build_fitting_config(cfg5)
         delete!(cfg5["precondition"], "band_limit")
-        @test_throws "need a curvature function" BlackBoxVLBIImaging._metric_adaptor(sg)
+        @test_throws "need a curvature function" BlackBoxComrade._metric_adaptor(sg)
         @test isempty(ga.residual_at)
         cr = deepcopy(cfg5)
         merge!(cr["precondition"], Dict("residual_at" => [0.8], "residual_draws" => 20, "residual_steps" => 20, "residual_directions" => 8, "residual_threshold" => 6.0))
         sr = build_fitting_config(cr)
         @test (sr.precond_residual_at, sr.precond_residual_draws, sr.precond_residual_steps, sr.precond_residual_directions, sr.precond_residual_threshold) == ([0.8], 20, 20, 8, 6.0)
-        gr = BlackBoxVLBIImaging._metric_adaptor(sr, H)
+        gr = BlackBoxComrade._metric_adaptor(sr, H)
         @test (gr.residual_at, gr.residual_draws, gr.residual_steps, gr.residual_directions, gr.residual_threshold) == ([0.8], 20, 20, 8, 6.0)
         @test isnothing(gr.rescale)
         merge!(cr["precondition"], Dict("rescale" => true, "rescale_n0" => 2.0, "rescale_bound" => 50.0))
-        gs = BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cr), H)
+        gs = BlackBoxComrade._metric_adaptor(build_fitting_config(cr), H)
         @test (gs.rescale.n0, gs.rescale.bound) == (2.0, 50.0)
         cr["precondition"]["residual_directions"] = 21
-        @test_throws "residual_directions must lie in 1:residual_steps" BlackBoxVLBIImaging._metric_adaptor(build_fitting_config(cr), H)
+        @test_throws "residual_directions must lie in 1:residual_steps" BlackBoxComrade._metric_adaptor(build_fitting_config(cr), H)
         for (edit, msg) in (
                 (c -> (c["precondition"]["residual_at"] = [0.8]; delete!(c["precondition"], "refit_kind")), "residual_at apply to refit_kind = \"gauss_newton\" only"),
                 (c -> c["precondition"]["refit_kind"] = "hessian", "precondition.refit_kind must be"),
@@ -664,7 +664,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         ss = build_fitting_config(cs)
         @test (ss.precond_refit_kind, ss.precond_support_cut) == ("gauss_newton_support", 3.0e-3)
         Bf(x) = ones(length(x), 1)
-        @test BlackBoxVLBIImaging._metric_adaptor(ss, H; basis = Bf).basis === Bf
+        @test BlackBoxComrade._metric_adaptor(ss, H; basis = Bf).basis === Bf
         for (edit, msg) in (
                 (c -> c["precondition"]["support_cut"] = 1.5, "support_cut must lie in (0, 1)"),
                 (c -> c["precondition"]["band_limit"] = 2.0, "sets its own basis"),
@@ -686,7 +686,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
     end
 
     @testset "likelihood-informed subspace" begin
-        BB = BlackBoxVLBIImaging
+        BB = BlackBoxComrade
         rng = Random.Xoshiro(7)
         n = 60
         lowrank(λ) = (V = Matrix(qr(randn(rng, n, length(λ))).Q)[:, eachindex(λ)]; (V * Diagonal(λ) * V', V))
@@ -739,14 +739,14 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         skym2, _ = build_sky_config(exconfig("image.toml"))
         @test skym2 isa SkyModel
         # NonCenteredMRF (order 2) wants nx such that nx+1 is a product of small primes
-        nx, ny = BlackBoxVLBIImaging.snap_grid_size(NonCenteredMRF(GMRF), 2, 64, 64)
+        nx, ny = BlackBoxComrade.snap_grid_size(NonCenteredMRF(GMRF), 2, 64, 64)
         @test (nx == 63) && (ny == 63)
         # GMRF order 1 snaps to a product of small primes
-        @test BlackBoxVLBIImaging.snap_grid_size(GMRF, 1, 23, 23) == (24, 24)
+        @test BlackBoxComrade.snap_grid_size(GMRF, 1, 23, 23) == (24, 24)
     end
 
     @testset "Gaussian background mean with a fixed FWHM" begin
-        BB = BlackBoxVLBIImaging
+        BB = BlackBoxComrade
         g = imagepixels(μas2rad(200.0), μas2rad(200.0), 32, 32)
         free = GaussBkgdMean(g, μas2rad(40.0), μas2rad(20.0))
         fixed = FixedGaussBkgdMean(g, μas2rad(40.0))
@@ -766,7 +766,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
     end
 
     @testset "Student-t blob mean" begin
-        BB = BlackBoxVLBIImaging
+        BB = BlackBoxComrade
         g = imagepixels(μas2rad(200.0), μas2rad(200.0), 64, 64)
         for ν in (1.0, 3.0, 30.0)
             r = BB._tblob_halfwidth(ν)
@@ -785,7 +785,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
     end
 
     @testset "anisotropic power-law mean" begin
-        BB = BlackBoxVLBIImaging
+        BB = BlackBoxComrade
         g = imagepixels(μas2rad(200.0), μas2rad(200.0), 64, 64)
         rc = μas2rad(10.0)
         env = AnisotropicPowerLawMean(g, rc)
@@ -940,9 +940,9 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         # n ≥ 2 about the data beam in pixels with log-sd 0.7, each truncated to [1, 32] pixels
         skyl, _ = build_sky_config(markovcfg(rho_prior = "lognormal"))
         beam_px = μas2rad(20.0) / step(skyl.grid.X)
-        @test logpdf(skyl.prior.ρa[1], 7.0) ≈ logpdf(BlackBoxVLBIImaging.Distributions.truncated(LogNormal(log(16.0), 1.0); lower = 1.0, upper = 32.0), 7.0)
+        @test logpdf(skyl.prior.ρa[1], 7.0) ≈ logpdf(BlackBoxComrade.Distributions.truncated(LogNormal(log(16.0), 1.0); lower = 1.0, upper = 32.0), 7.0)
         for n in 2:3
-            @test logpdf(skyl.prior.ρa[n], 7.0) ≈ logpdf(BlackBoxVLBIImaging.Distributions.truncated(LogNormal(log(beam_px), 0.7); lower = 1.0, upper = 32.0), 7.0)
+            @test logpdf(skyl.prior.ρa[n], 7.0) ≈ logpdf(BlackBoxComrade.Distributions.truncated(LogNormal(log(beam_px), 0.7); lower = 1.0, upper = 32.0), 7.0)
             @test logpdf(skyl.prior.ρa[n], 0.9) == -Inf
             @test logpdf(skyl.prior.ρa[n], 33.0) == -Inf
         end
@@ -950,14 +950,14 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
         # the Stokes-I Markov constructor takes the same option (its field is `ρs`)
         skyi, _ = build_sky_config(markovcfg(polrep = "TotalIntensity", rho_prior = "lognormal"))
-        @test logpdf(skyi.prior.ρs[1], 7.0) ≈ logpdf(BlackBoxVLBIImaging.Distributions.truncated(LogNormal(log(16.0), 1.0); lower = 1.0, upper = 32.0), 7.0)
+        @test logpdf(skyi.prior.ρs[1], 7.0) ≈ logpdf(BlackBoxComrade.Distributions.truncated(LogNormal(log(16.0), 1.0); lower = 1.0, upper = 32.0), 7.0)
 
         # the flat and StdNormal transports map the whole real line onto [1, 32]
-        for sp in (BlackBoxVLBIImaging.PT.TVFlat(), BlackBoxVLBIImaging.PT.StdNormal())
-            t = BlackBoxVLBIImaging.PT.transport_node(skyl.prior.ρa[2], sp)
-            @test BlackBoxVLBIImaging.PT.latent_pfwd(t, [-30.0]) >= 1.0
-            @test BlackBoxVLBIImaging.PT.latent_pfwd(t, [30.0]) <= 32.0
-            @test BlackBoxVLBIImaging.PT.latent_pfwd(t, BlackBoxVLBIImaging.PT.latent_pback(t, 2.5)) ≈ 2.5
+        for sp in (BlackBoxComrade.PT.TVFlat(), BlackBoxComrade.PT.StdNormal())
+            t = BlackBoxComrade.PT.transport_node(skyl.prior.ρa[2], sp)
+            @test BlackBoxComrade.PT.latent_pfwd(t, [-30.0]) >= 1.0
+            @test BlackBoxComrade.PT.latent_pfwd(t, [30.0]) <= 32.0
+            @test BlackBoxComrade.PT.latent_pfwd(t, BlackBoxComrade.PT.latent_pback(t, 2.5)) ≈ 2.5
         end
 
         # the model still evaluates at a draw from the log-normal prior
@@ -978,7 +978,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
     end
 
     @testset "Matérn spectrum and prior" begin
-        BB = BlackBoxVLBIImaging
+        BB = BlackBoxComrade
         function materncfg(; kwargs...)
             cfg = exconfig("image.toml")
             cfg["grid"]["nx"] = 32
@@ -1072,14 +1072,14 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
     @testset "data product from polrep" begin
         # Stokes-I sky models fit complex visibilities; polarized models fit coherencies.
-        @test BlackBoxVLBIImaging.data_product(TotalIntensity()) === Visibilities
-        @test BlackBoxVLBIImaging.data_product(PolExp()) === Coherencies
-        @test BlackBoxVLBIImaging.data_product(Poincare()) === Coherencies
+        @test BlackBoxComrade.data_product(TotalIntensity()) === Visibilities
+        @test BlackBoxComrade.data_product(PolExp()) === Coherencies
+        @test BlackBoxComrade.data_product(Poincare()) === Coherencies
         # sky_polrep is the single parse point shared by the sky and data paths.
-        @test BlackBoxVLBIImaging.sky_polrep(
+        @test BlackBoxComrade.sky_polrep(
             Dict("model" => Dict("polrep" => "TotalIntensity"))
         ) isa TotalIntensity
-        @test BlackBoxVLBIImaging.sky_polrep(Dict{String, Any}()) isa PolExp  # default
+        @test BlackBoxComrade.sky_polrep(Dict{String, Any}()) isa PolExp  # default
         # dlist is polarized coherencies by construction; TotalIntensity is unsupported and
         # must error (before/independent of touching a real file).
         @test_throws ErrorException build_data_dlist(
@@ -1194,7 +1194,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
             post = VLBIPosterior(skym, intm, dcoh; imgdata)
             x0 = prior_sample(Random.default_rng(), post)
             @test isfinite(logdensityof(post, x0))
-            xopt, _ = comrade_opt(post, BlackBoxVLBIImaging.Adam(); initial_params = x0, maxiters = 5, g_tol = 0.1)
+            xopt, _ = comrade_opt(post, BlackBoxComrade.Adam(); initial_params = x0, maxiters = 5, g_tol = 0.1)
             @test isfinite(logdensityof(post, xopt))
 
             @testset "fix_scales: held optimization and field rescale" begin
@@ -1215,8 +1215,8 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
                 # the CPU optimizer moves everything but the held scales
                 xs = prior_sample(Random.Xoshiro(3), postf)
-                xh, _ = BlackBoxVLBIImaging._comrade_opt_held(
-                    postf, BlackBoxVLBIImaging.Adam(), held; initial_params = xs,
+                xh, _ = BlackBoxComrade._comrade_opt_held(
+                    postf, BlackBoxComrade.Adam(), held; initial_params = xs,
                     maxiters = 20, g_tol = 0.1
                 )
                 for (k, v) in held
@@ -1224,7 +1224,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                 end
                 @test xh.sky.σa != xs.sky.σa
                 @test xh.sky.b != xs.sky.b
-                @test logdensityof(postf, xh) > logdensityof(postf, BlackBoxVLBIImaging._hold_scales(xs, held))
+                @test logdensityof(postf, xh) > logdensityof(postf, BlackBoxComrade._hold_scales(xs, held))
 
                 # rescaling puts every field at unit rms and leaves the image where it was
                 xr = rescale_fields(postf, xh)
@@ -1250,25 +1250,25 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                     fix_scales = [:σb, :σc, :σd]
                 )
                 xt = mktempdir() do d
-                    BlackBoxVLBIImaging._optimize_tempered(
+                    BlackBoxComrade._optimize_tempered(
                         joinpath(d, "t"), skyf, intm, (dcoh,), imgf, strat,
-                        BlackBoxVLBIImaging.Adam(), Random.Xoshiro(4)
+                        BlackBoxComrade.Adam(), Random.Xoshiro(4)
                     )
                 end
                 for k in (:a, :b, :c, :d)
                     @test sq(xt.sky[k]) ≈ 1 rtol = 1.0e-12
                 end
                 @test_throws "'σz' is not a scalar sky parameter" mktempdir() do d
-                    BlackBoxVLBIImaging._optimize_tempered(
+                    BlackBoxComrade._optimize_tempered(
                         joinpath(d, "t"), skyf, intm, (dcoh,), imgf,
                         FittingStrategy(; maxiters = 2, ntrials = 1, fix_scales = [:σz]),
-                        BlackBoxVLBIImaging.Adam(), Random.Xoshiro(4)
+                        BlackBoxComrade.Adam(), Random.Xoshiro(4)
                     )
                 end
             end
 
             @testset "symmetry moves" begin
-                BB = BlackBoxVLBIImaging
+                BB = BlackBoxComrade
                 ProbProg = BB.Reactant.ProbProg
                 icfg = exconfig("image.toml")
                 icfg["grid"]["nx"] = 16
@@ -1534,7 +1534,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                     x = Comrade.inverse(tpw, θw[2])
                     xh, ldh = Comrade.propose(om, x, 5.3, ctx)
                     g = (x, s, c) -> Comrade.propose(om, x, s, c)
-                    xd, ldd = BlackBoxVLBIImaging.Reactant.@jit g(BB.Reactant.to_rarray(x), BB.Reactant.ConcreteRNumber(5.3), dctx)
+                    xd, ldd = BlackBoxComrade.Reactant.@jit g(BB.Reactant.to_rarray(x), BB.Reactant.ConcreteRNumber(5.3), dctx)
                     @test Array(xd) ≈ xh rtol = 1.0e-9
                     @test Float64(ldd) == ldh
 
@@ -1614,7 +1614,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                     # a start point whose latent is not finite fails before sampling
                     @test BB.check_start(posts, BB.PT.StdNormal(), θd[1]) ≈ logdensityof(tps, us[1])
                     θ1 = θd[1]
-                    θbad = BlackBoxVLBIImaging.@set θ1.sky.mean.fwhm = 0.0
+                    θbad = BlackBoxComrade.@set θ1.sky.mean.fwhm = 0.0
                     @test_throws "non-finite latent coordinates in sky.mean.fwhm" BB.check_start(posts, BB.PT.StdNormal(), θbad)
 
                     # real-line phase chains: the start re-wrap and the ±2π sheet move

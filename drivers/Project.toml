@@ -1,7 +1,7 @@
 [deps]
-BlackBoxVLBIImaging = "5bd28f6b-d16a-4ecc-8550-9c719f2b7021"
+BlackBoxComrade = "5bd28f6b-d16a-4ecc-8550-9c719f2b7021"
 Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [sources]
-BlackBoxVLBIImaging = {path = ".."}
+BlackBoxComrade = {path = ".."}

@@ -1,14 +1,14 @@
-using BlackBoxVLBIImaging
+using BlackBoxComrade
 using Documenter
 
-DocMeta.setdocmeta!(BlackBoxVLBIImaging, :DocTestSetup, :(using BlackBoxVLBIImaging); recursive = true)
+DocMeta.setdocmeta!(BlackBoxComrade, :DocTestSetup, :(using BlackBoxComrade); recursive = true)
 
 makedocs(;
-    modules = [BlackBoxVLBIImaging],
+    modules = [BlackBoxComrade],
     authors = "Paul Tiede <ptiede91@gmail.com> and contributors",
-    sitename = "BlackBoxVLBIImaging.jl",
+    sitename = "BlackBoxComrade.jl",
     format = Documenter.HTML(;
-        canonical = "https://ptiede.github.io/BlackBoxVLBIImaging.jl",
+        canonical = "https://ptiede.github.io/BlackBoxComrade.jl",
         edit_link = "main",
         assets = String[],
     ),
@@ -18,6 +18,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo = "github.com/ptiede/BlackBoxVLBIImaging.jl",
+    repo = "github.com/ptiede/BlackBoxComrade.jl",
     devbranch = "main",
 )

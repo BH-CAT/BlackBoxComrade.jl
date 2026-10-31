@@ -1,14 +1,14 @@
 ```@meta
-CurrentModule = BlackBoxVLBIImaging
+CurrentModule = BlackBoxComrade
 ```
 
-# BlackBoxVLBIImaging
+# BlackBoxComrade
 
-Documentation for [BlackBoxVLBIImaging](https://github.com/ptiede/BlackBoxVLBIImaging.jl).
+Documentation for [BlackBoxComrade](https://github.com/ptiede/BlackBoxComrade.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [BlackBoxVLBIImaging]
+Modules = [BlackBoxComrade]
 ```

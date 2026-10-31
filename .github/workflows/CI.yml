@@ -23,8 +23,8 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.10'
-          - '1.11'
+          - '1.12'
+          - '1'
           - 'pre'
         os:
           - ubuntu-latest
@@ -67,9 +67,9 @@ jobs:
         shell: julia --project=docs --color=yes {0}
         run: |
           using Documenter: DocMeta, doctest
-          using BlackBoxVLBIImaging
-          DocMeta.setdocmeta!(BlackBoxVLBIImaging, :DocTestSetup, :(using BlackBoxVLBIImaging); recursive=true)
-          doctest(BlackBoxVLBIImaging)
+          using BlackBoxComrade
+          DocMeta.setdocmeta!(BlackBoxComrade, :DocTestSetup, :(using BlackBoxComrade); recursive=true)
+          doctest(BlackBoxComrade)
   runic:
     name: Runic formatting
     runs-on: ubuntu-latest

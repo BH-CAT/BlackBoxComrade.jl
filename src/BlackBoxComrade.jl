@@ -1,4 +1,4 @@
-module BlackBoxVLBIImaging
+module BlackBoxComrade
 
 using Reexport
 @reexport using Comrade
@@ -76,6 +76,7 @@ include("pipeline/pnc_moves.jl")
 include("pipeline/mclmc.jl")
 include("pipeline/imager.jl")
 include("pipeline/run.jl")
+include("cli.jl")
 
 function __init__()
     # Parallelism comes from Julia threads (and the NUFFT), so pin BLAS to one thread.

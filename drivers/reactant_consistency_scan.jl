@@ -20,10 +20,10 @@
 # optimum (`Dict(:xopt=>...)` from a run) to use as the base point instead of a prior draw —
 # pass a CPU-converged optimum to see the divergence exactly where the fit lands.
 
-using BlackBoxVLBIImaging
+using BlackBoxComrade
 using Random, Printf, TOML
 
-const BBI = BlackBoxVLBIImaging
+const BBI = BlackBoxComrade
 const Reactant = BBI.Reactant
 const Optimisers = BBI.Optimisers
 const Comrade = BBI.Comrade

@@ -1,4 +1,4 @@
-name = "BlackBoxVLBIImaging"
+name = "BlackBoxComrade"
 uuid = "5bd28f6b-d16a-4ecc-8550-9c719f2b7021"
 version = "0.1.0"
 authors = ["Paul Tiede <ptiede91@gmail.com> and contributors"]
@@ -86,10 +86,13 @@ TransformVariables = "0.8.19"
 VLBIFiles = "0.4"
 VLBIImagePriors = "0.10"
 VLBISkyModels = "0.6.29"
-julia = "1.10"
+julia = "1.12"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test"]
+
+[apps]
+bbcomrade = {}
