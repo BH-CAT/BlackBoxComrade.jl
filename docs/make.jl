@@ -8,7 +8,7 @@ makedocs(;
     authors = "Paul Tiede <ptiede91@gmail.com> and contributors",
     sitename = "BlackBoxComrade.jl",
     format = Documenter.HTML(;
-        canonical = "https://ptiede.github.io/BlackBoxComrade.jl",
+        canonical = "https://blackholeseh.github.io/BlackBoxComrade.jl",
         edit_link = "main",
         assets = String[],
     ),
@@ -18,6 +18,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo = "github.com/ptiede/BlackBoxComrade.jl",
+    repo = "github.com/BlackHolesEH/BlackBoxComrade.jl",
     devbranch = "main",
 )

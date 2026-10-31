@@ -11,6 +11,9 @@ concurrency:
   # Cancel intermediate builds: only if it is a pull request build.
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+env:
+  # Pkg clones through the git CLI, which applies the insteadOf rule below.
+  JULIA_PKG_USE_CLI_GIT: true
 jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }}
@@ -32,6 +35,12 @@ jobs:
           - x64
     steps:
       - uses: actions/checkout@v7
+      - name: Allow cloning the private KineticSamplers
+        run: |
+          test -n "$TOKEN" || { echo "::error::secret KINETICSAMPLERS_TOKEN is not set"; exit 1; }
+          git config --global url."https://x-access-token:${TOKEN}@github.com/BlackHolesEH/KineticSamplers.jl".insteadOf "https://github.com/BlackHolesEH/KineticSamplers.jl"
+        env:
+          TOKEN: ${{ secrets.KINETICSAMPLERS_TOKEN }}
       - uses: julia-actions/setup-julia@v3
         with:
           version: ${{ matrix.version }}
@@ -54,6 +63,12 @@ jobs:
       statuses: write
     steps:
       - uses: actions/checkout@v7
+      - name: Allow cloning the private KineticSamplers
+        run: |
+          test -n "$TOKEN" || { echo "::error::secret KINETICSAMPLERS_TOKEN is not set"; exit 1; }
+          git config --global url."https://x-access-token:${TOKEN}@github.com/BlackHolesEH/KineticSamplers.jl".insteadOf "https://github.com/BlackHolesEH/KineticSamplers.jl"
+        env:
+          TOKEN: ${{ secrets.KINETICSAMPLERS_TOKEN }}
       - uses: julia-actions/setup-julia@v3
         with:
           version: '1'
