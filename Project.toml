@@ -44,7 +44,7 @@ VLBISkyModels = "d6343c73-7174-4e0f-bb64-562643efbeca"
 
 [sources]
 Comrade = {rev = "ptiede-statespaceint", url = "https://github.com/ptiede/Comrade.jl"}
-KineticSamplers = {rev = "main", url = "https://github.com/BlackHolesEh/KineticSamplers.jl"}
+KineticSamplers = {rev = "main", url = "https://github.com/BH-CAT/KineticSamplers.jl"}
 
 [compat]
 ADTypes = "1.19"
