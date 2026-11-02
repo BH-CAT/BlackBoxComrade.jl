@@ -22,6 +22,16 @@ function _site_points(sa)
     end
 end
 
+"""
+    stdnormal_posterior(post::VLBIPosterior)
+
+`post` transported to the `StdNormal` latent space, where the prior is exactly N(0, I).
+Every prior block must have an exact transport to N(0, I); circular priors need
+`AngularProjectedNormal` or `WrappedNormal`, and wrapped Gauss–Markov chains are not
+supported.
+"""
+stdnormal_posterior(post::VLBIPosterior) = PT.transport_to(post, PT.StdNormal())
+
 # term => the chain points `post` fixes (reference or initial values): those whose value does
 # not move when the StdNormal latent point does.
 function _fixed_points(post)

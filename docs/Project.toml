@@ -1,5 +1,5 @@
 [deps]
-BlackBoxComrade = "5bd28f6b-d16a-4ecc-8550-9c719f2b7021"
+BlackboxComrade = "5bd28f6b-d16a-4ecc-8550-9c719f2b7021"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 
 [compat]

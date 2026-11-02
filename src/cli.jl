@@ -1,8 +1,8 @@
 const CLI_USAGE = """
 Image a VLBI observation, configured entirely from four TOML files.
 
-The sampler (AdvancedHMC NUTS, Reactant NUTS or MCLMC) is part of the fitting TOML, since
-selecting Reactant also changes the optimizer path.
+The sampler (AdvancedHMC NUTS, Reactant NUTS, MCLMC or WALNUTS) is part of the fitting
+TOML, since selecting Reactant also changes the optimizer path.
 
 Usage: bbcomrade --image <path> --instrument <path> --data <path> --fitting <path>
             [--outpath <path>] [--restart]
@@ -85,7 +85,7 @@ function _split_option(s)
     return s[1:prevind(s, k)], true, s[nextind(s, k):end]
 end
 
-# The entry point of the `bbcomrade` app (`julia -m BlackBoxComrade`).
+# The entry point of the `bbcomrade` app (`julia -m BlackboxComrade`).
 function (@main)(args)
     bbcomrade(args)
     return 0

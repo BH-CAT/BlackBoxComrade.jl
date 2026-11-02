@@ -1,7 +1,9 @@
-# The fitting-strategy config. Replaces the ad-hoc CLI flags that controlled optimization,
-# the noise-tempering schedule, and the MCMC sampler (AdvancedHMC vs Reactant NUTS).
+# The fitting-strategy config: optimization, the noise-tempering schedule, and the MCMC
+# sampler (AdvancedHMC NUTS, Reactant NUTS, or KineticSamplers MCLMC or WALNUTS).
 
-const MOVE_KINDS = ("flux_gain", "field_scale", "rho_field", "pnc_field", "pnc_orbit", "mean_field", "phase_sheet", "chain_hyper")
+const KINETIC_ALGORITHMS = ("mclmc", "walnuts")
+const KINETIC_WARMUP = Dict("mclmc" => 150_000, "walnuts" => 1_000)
+const MOVE_KINDS = ("flux_gain", "field_scale", "rho_field", "mean_field", "phase_sheet", "chain_hyper")
 
 """
     MoveSpec
@@ -50,116 +52,22 @@ Base.@kwdef struct FittingStrategy
     term_buffer::Int = 500
     max_tree_depth::Int = 10
     chunk_size::Int = 100
-    # "nuts", or "mclmc" for KineticSamplers MCLMC with `chains` chains and a pooled warmup
+    # "nuts", or "mclmc" or "walnuts" for KineticSamplers chains with `chains` chains and a
+    # pooled warmup
     algorithm::String = "nuts"
     chains::Int = 4
     max_step_halvings::Int = 3
-    # Welford diagonal metric adaptation during warmup (Reactant path). Turn OFF for
-    # preconditioned rounds: the metric adapts to marginal variances, which undoes any
-    # transform component that trades marginal against conditional width (gradient
-    # balance); with it off, the fitted preconditioner IS the metric and only the step
-    # size adapts. Keep ON for pilot rounds with no preconditioner.
-    adapt_mass_matrix::Bool = true
-    # Diagonal inverse mass matrix adapted from warmup draws and gradients: "none" or
-    # "nutpie" (`Comrade.NutpieDiagonal`); needs `adapt_mass_matrix = false` or in-run refits.
-    diagonal::String = "none"
-    # Metropolis–Hastings moves run between the Reactant NUTS chunks (see `build_moves`).
+    # Metropolis–Hastings moves run between sampler chunks or blocks (see `build_moves`).
     moves::Vector{MoveSpec} = MoveSpec[]
-    # preconditioning: before sampling, fit a low-rank affine reparameterization of the
-    # flat latent space from a pilot run's posterior draws (see `fit_preconditioner`),
-    # and sample in the preconditioned coordinates. `precond_pilot` is the pilot's MCMC
-    # DiskStore directory; `nothing` disables preconditioning.
-    precond_pilot::Union{Nothing, String} = nothing
-    precond_rank::Int = 16
-    precond_nsamples::Int = 2000
-    # Leading fraction of the draws a fit drops; `nothing` keeps each fit's own default (half
-    # of the warmup so far for in-run refits, none of a pilot's draws).
-    precond_discard::Union{Nothing, Float64} = nothing
-    # Carry the pilot's own preconditioner into the fit (see `fit_preconditioner`); set
-    # this whenever the pilot itself sampled preconditioned, so rounds accumulate.
-    precond_augment::Bool = false
-    # In-run windowed refits (Reactant path): fractions of nadapt at which warmup pauses,
-    # refits the preconditioner from the run's own warmup log, and continues in the new
-    # coordinates with the metric frozen.
-    # With this set, no pilot run is needed: launch once, segment 0 adapts Welford-style,
-    # the refits take over. Empty disables.
-    precond_refit_at::Vector{Float64} = Float64[]
-    # Refit schedule: "manual" uses refit_at; "nutpie" refits every chunk to 30% of
-    # warmup then every 8 chunks to 85% (Seyboldt+ §3 cadence); "stan" refits at
-    # doubling gaps from step 100 to 85% — fewer refits, with exponentially longer
-    # uninterrupted dual-averaging segments as warmup progresses (each refit restarts
-    # dual averaging, so late refits must be sparse for the step size to stabilize).
-    precond_refit_schedule::String = "manual"
-    # What each in-run refit builds on (`Comrade.FisherLowRank` `carry`): "none" fits from
-    # scratch, "rescale" keeps the current directions re-scaled on the window, "keep" keeps
-    # the starting transform (`seed_transport`) exactly and refits only the directions added
-    # to it.
-    precond_refit_carry::String = "none"
-    # The most wide directions an in-run Fisher refit keeps (`Comrade.FisherLowRank`
-    # `max_wide`); nothing sets no limit.
-    precond_max_wide::Union{Nothing, Int} = nothing
-    # A stiff-core correction on top of the in-run Fisher refits from 30% of warmup on
-    # (`Comrade.StiffCore` with its defaults): Lanczos at the window's draws finds the stiff
-    # directions that change from draw to draw, and their power mean is whitened down to the
-    # largest curvature outside them (Reactant sampler only).
-    precond_stiff_core::Bool = false
-    # In-run Fisher refits choose their rank, at most `precond_rank`, from this fraction of
-    # each window's draws held out (`Comrade.FisherLowRank` `holdout`, `rank_tol`); 0 keeps
-    # `precond_rank`.
-    precond_rank_holdout::Float64 = 0.0
-    precond_rank_tol::Float64 = 0.05
-    # Warmup steps between the draws in-run Fisher refits record (`Comrade.FisherLowRank`
-    # `record_every`); `nothing` keeps Comrade's default.
-    precond_record_every::Union{Nothing, Int} = nothing
-    # What in-run refits fit: "fisher" (`Comrade.FisherLowRank`, from warmup draws and
-    # scores) or "gauss_newton" (`Comrade.GaussNewtonLowRank`, from the likelihood's
-    # Gauss–Newton curvature at the warmup draws; "stdnormal" space, Reactant only). For
-    # "gauss_newton", `precond_rank` is the most directions a fit keeps, `precond_threshold`
-    # the smallest curvature eigenvalue kept, `precond_oversample` the extra probe columns,
-    # `precond_probes_per_draw` the probe columns applied per warmup draw (0 = all), and
-    # `precond_band_limit` the highest wavenumber of a stationary random sky field's white
-    # coefficients the directions may use, in multiples of the longest baseline (Inf = all).
-    # "gauss_newton_support" probes with a basis built from each refit window's first draw
-    # instead of random columns: the sky-field perturbations at the pixels brighter than
-    # `precond_support_cut` × the peak, plus every other latent coordinate (see
-    # `support_basis`). `precond_residual_at` lists fractions of warmup at which a
-    # Gauss–Newton residual refit runs in place of a fit: the stiff directions the current
-    # preconditioner leaves, from `precond_residual_steps`-step Lanczos runs at up to
-    # `precond_residual_draws` draws recorded since the previous refit
-    # (`precond_residual_directions` each), whitened where their averaged curvature is at
-    # least `precond_residual_threshold` (see `Comrade.GaussNewtonLowRank`).
-    # `precond_rescale` sets the scale of each fitted Gauss–Newton direction at every refit
-    # from the window's draws and gradients (`Comrade.NutpieDiagonal` with
-    # `precond_rescale_n0` and `precond_rescale_bound`) instead of from the curvature alone.
-    precond_refit_kind::String = "fisher"
-    precond_threshold::Float64 = 100.0
-    precond_oversample::Int = 10
-    precond_probes_per_draw::Int = 0
-    precond_band_limit::Float64 = 3.0
-    precond_support_cut::Float64 = 1.0e-2
-    precond_residual_at::Vector{Float64} = Float64[]
-    precond_residual_draws::Int = 30
-    precond_residual_steps::Int = 25
-    precond_residual_directions::Int = 10
-    precond_residual_threshold::Float64 = 4.0
-    precond_rescale::Bool = false
-    precond_rescale_n0::Float64 = 5.0
-    precond_rescale_bound::Float64 = 10.0
-    # Start in the latent space stored in a transport.jls (a low-rank preconditioner of the
-    # run's latent space). With in-run refits they refine it instead of the score-init
-    # diagonal; without, it is the fixed transform. Exclusive with `precond_pilot`.
-    # "" = none.
-    precond_seed_transport::String = ""
-    # Base-space directions every Fisher refit keeps, with the standard deviation along each
-    # (`Comrade.FisherLowRank` `fixed`): a .jls holding `(; directions, sd)`, the directions
-    # as matrix columns in the run's latent space. "" = none.
-    precond_fixed_directions::String = ""
     # run
     # Latent space optimized and sampled in: "flat" (`asflat`) or "stdnormal" (the
     # ProbabilityTransports `StdNormal` transport, where the prior is N(0, I); needed by
     # priors with no flat transform, e.g. `AngularProjectedNormal`).
     latent_space::String = "flat"
     use_reactant::Bool = false
+    # Reactant backend, "cpu" or "gpu"; `nothing` keeps Reactant's default (a GPU when one
+    # is available).
+    device::Union{Nothing, String} = nothing
     benchmark::Bool = true
     # On the Reactant path, check the device log-density+gradient against the CPU/Enzyme
     # reference at a prior draw before optimizing, and error on mismatch (catches broken
@@ -183,16 +91,21 @@ end
 
 Parse a fitting-strategy TOML into a [`FittingStrategy`](@ref). Sections: `[optimizer]`,
 `[tempering]`, `[sampler]`, `[run]`. `sampler.algorithm` is `"nuts"` (default), whose backend
-(AdvancedHMC NUTS vs Reactant NUTS) follows `run.use_reactant`, or `"mclmc"`, which runs
-`sampler.chains` chains of KineticSamplers MCLMC (see [`sample_mclmc`](@ref)) and needs
-`run.use_reactant = true` and `run.latent_space = "stdnormal"`. For MCLMC, `nadapt` is the
-warmup's gradients per chain (default 150 000), `nsample` the draws kept per chain (default
-1000), one per `chunk_size` steps,
-and `max_step_halvings` (default 3) the halvings of a step whose energy error is too large;
-the NUTS settings (`step_size`, `max_tree_depth`, `adapt_mass_matrix`, `diagonal`,
-`[precondition]`, run checkpoints) are errors with it. `run.start` may also name the run base
-of an MCLMC run (the directory holding its `chain_k`), whose chains' last draws start the
-chains one to one.
+(AdvancedHMC NUTS vs Reactant NUTS with its diagonal metric) follows `run.use_reactant`, or
+`"mclmc"` or `"walnuts"`, which run `sampler.chains` chains of KineticSamplers MCLMC or WALNUTS
+(see [`sample_kinetic`](@ref)) and need `run.use_reactant = true`. `nadapt` is the warmup length per chain, in steps for
+MCLMC (default 150 000) and in draws for WALNUTS (default 1000), and `nsample` the draws kept
+per chain (default 1000). For MCLMC a draw is kept every `chunk_size` steps, and `max_step_halvings` (default 3) is the number of halvings
+of a step whose energy error is too large. For WALNUTS every draw is kept, `chunk_size`
+(default 10) is the draws per sampling block, which must divide `nsample`, and `max_tree_depth`
+(default 10) is the most trajectory doublings. `step_size` and the run checkpoints are
+errors with either algorithm, as is `max_tree_depth` with MCLMC. `run.start` may also name the
+run base of an MCLMC or WALNUTS run (the directory holding its `chain_k`), whose chains' last
+draws start the chains one to one.
+
+`run.device` (`"cpu"` or `"gpu"`) selects the Reactant backend and needs
+`run.use_reactant = true`. Left out, Reactant uses a GPU when one is available and the CPU
+otherwise. `"gpu"` is an error when no GPU is available.
 
 `[optimizer] fix_scales` lists scalar sky parameters (e.g. `["σb", "σc", "σd"]`) that every
 optimization stage holds at the median of their prior; the other parameters are optimized
@@ -238,27 +151,27 @@ The kinds, all of which leave the likelihood unchanged unless `band_limit` is fi
     site on its own, so a round is one sweep over the sites (`params`: chain terms);
     `"stdnormal"` space only.
 
-A kind may appear more than once only with disjoint `params`. Moves need the Reactant sampler
-(`use_reactant = true`). Unknown kinds and keys are errors, as are the list form
-`moves = [...]` and `moves_per_chunk`. With NUTS the moves run once per sampler chunk
+A kind may appear more than once only with disjoint `params`. Moves run with the Reactant
+NUTS, MCLMC and WALNUTS samplers (`use_reactant = true`), not with the CPU NUTS sampler.
+Unknown kinds and keys are errors, as are the list form `moves = [...]` and
+`moves_per_chunk`. With NUTS the moves run once per sampler chunk
 (`chunk_size`, or `sample_checkpoint` when set); with MCLMC on every chain once per 50 blocks
-of `chunk_size` steps.
+of `chunk_size` steps, and with WALNUTS on every chain once per 10 blocks.
 
 `[run] latent_space` picks the space the optimizer and sampler work in: `"flat"` (default,
 `asflat`) or `"stdnormal"` (the `StdNormal` transport, where the prior is exactly N(0, I);
-required by priors without a flat transform such as `AngularProjectedNormal`). The
-low-rank preconditioner acts in front of either. In the `"stdnormal"` space the start point's real-line phase chains are re-wrapped
-to their shortest steps (see [`unwrap_phase_chains`](@ref)) before sampling.
+required by priors without a flat transform such as `AngularProjectedNormal`). In the
+`"stdnormal"` space the start point's real-line phase chains are re-wrapped to their shortest
+steps (see [`unwrap_phase_chains`](@ref)) before sampling.
 """
 function build_fitting_config(cfg::AbstractDict)
     check_config_keys(
-        cfg, ("optimizer", "tempering", "sampler", "precondition", "run"),
+        cfg, ("optimizer", "tempering", "sampler", "run"),
         "the fitting config (top level)"
     )
     opt = get(cfg, "optimizer", Dict{String, Any}())
     temp = get(cfg, "tempering", Dict{String, Any}())
     samp = get(cfg, "sampler", Dict{String, Any}())
-    prec = get(cfg, "precondition", Dict{String, Any}())
     run = get(cfg, "run", Dict{String, Any}())
 
     check_config_keys(
@@ -269,28 +182,16 @@ function build_fitting_config(cfg::AbstractDict)
         samp,
         (
             "nsample", "nadapt", "step_size", "target_accept", "init_buffer",
-            "term_buffer", "max_tree_depth", "chunk_size",
-            "adapt_mass_matrix", "diagonal", "moves", "moves_per_chunk",
+            "term_buffer", "max_tree_depth", "chunk_size", "moves", "moves_per_chunk",
             "algorithm", "chains", "max_step_halvings",
         ),
         "[sampler]"
     )
     check_config_keys(
-        prec,
-        (
-            "pilot", "rank", "nsamples", "discard", "augment",
-            "refit_at", "refit_schedule", "refit_carry", "max_wide", "rank_holdout", "rank_tol", "record_every", "stiff_core", "seed_transport", "fixed_directions",
-            "refit_kind", "threshold", "oversample", "probes_per_draw", "band_limit", "support_cut",
-            "residual_at", "residual_draws", "residual_steps", "residual_directions",
-            "residual_threshold", "rescale", "rescale_n0", "rescale_bound",
-        ),
-        "[precondition]"
-    )
-    check_config_keys(
         run,
         (
             "use_reactant", "benchmark", "verify_reactant", "start", "sample_checkpoint",
-            "checkpoint", "latent_space", "warmup_checkpoint",
+            "checkpoint", "latent_space", "warmup_checkpoint", "device",
         ),
         "[run]"
     )
@@ -301,6 +202,11 @@ function build_fitting_config(cfg::AbstractDict)
         "sampler.$(join(ahmc_only, ", sampler.")) apply to AdvancedHMC NUTS only " *
             "(run.use_reactant = false); Reactant NUTS has no setting for them"
     )
+    device = haskey(run, "device") ? String(run["device"]) : nothing
+    isnothing(device) || device in ("cpu", "gpu") ||
+        error("unknown run.device '$device'. Allowed: cpu, gpu")
+    (isnothing(device) || use_reactant) ||
+        error("run.device needs run.use_reactant = true: without Reactant everything runs on the CPU")
     latent_space = String(get(run, "latent_space", "flat"))
     latent_space in ("flat", "stdnormal") ||
         error("unknown run.latent_space '$latent_space'. Allowed: flat, stdnormal")
@@ -321,105 +227,41 @@ function build_fitting_config(cfg::AbstractDict)
         "sampler.moves_per_chunk is not a fitting-config key; set `rounds` in each [[sampler.moves]] table"
     )
     moves = _parse_move_specs(get(samp, "moves", Any[]), latent_space)
-    isempty(moves) || use_reactant ||
-        error("sampler.moves needs the Reactant sampler (run.use_reactant = true)")
-    diagonal = get(samp, "diagonal", "none")
-    diagonal in ("none", "nutpie") ||
-        error("sampler.diagonal must be \"none\" or \"nutpie\", got $(repr(diagonal))")
-    diagonal == "none" || use_reactant ||
-        error("sampler.diagonal needs the Reactant sampler (run.use_reactant = true)")
+    isempty(moves) || use_reactant || error(
+        "sampler.moves needs run.use_reactant = true: the CPU NUTS sampler does not run moves"
+    )
 
     algorithm = String(get(samp, "algorithm", "nuts"))
-    algorithm in ("nuts", "mclmc") ||
-        error("sampler.algorithm must be \"nuts\" or \"mclmc\", got $(repr(algorithm))")
-    if algorithm == "mclmc"
-        use_reactant || error("sampler.algorithm = \"mclmc\" needs run.use_reactant = true")
-        latent_space == "stdnormal" ||
-            error("sampler.algorithm = \"mclmc\" needs run.latent_space = \"stdnormal\"")
-        nuts_only = filter(
-            k -> haskey(samp, k), ["step_size", "max_tree_depth", "adapt_mass_matrix", "diagonal"]
+    algorithm in ("nuts", KINETIC_ALGORITHMS...) || error(
+        "sampler.algorithm must be \"nuts\", \"mclmc\" or \"walnuts\", got $(repr(algorithm))"
+    )
+    kinetic = algorithm in KINETIC_ALGORITHMS
+    for (key, allowed) in (
+            "step_size" => ("nuts",), "max_tree_depth" => ("nuts", "walnuts"),
+            "chains" => KINETIC_ALGORITHMS, "max_step_halvings" => ("mclmc",),
         )
-        isempty(nuts_only) || error(
-            "sampler.$(join(nuts_only, ", sampler.")) apply to NUTS only; MCLMC adapts its " *
-                "own step size and mass"
+        haskey(samp, key) && !(algorithm in allowed) && error(
+            "sampler.$key applies to sampler.algorithm = $(join(repr.(allowed), " or ")) only, " *
+                "not $(repr(algorithm))"
         )
-        isempty(prec) || error("[precondition] applies to NUTS only; MCLMC adapts its own mass")
+    end
+    if kinetic
+        use_reactant || error("sampler.algorithm = \"$algorithm\" needs run.use_reactant = true")
         run_nuts_only = filter(
             k -> get(run, k, 0) != 0, ["sample_checkpoint", "checkpoint", "warmup_checkpoint"]
         )
         isempty(run_nuts_only) ||
             error("run.$(join(run_nuts_only, ", run.")) apply to NUTS only")
-    else
-        mclmc_only = filter(k -> haskey(samp, k), ["chains", "max_step_halvings"])
-        isempty(mclmc_only) || error(
-            "sampler.$(join(mclmc_only, ", sampler.")) apply to sampler.algorithm = \"mclmc\" only"
-        )
     end
     chains = Int(get(samp, "chains", 4))
     chains >= 1 || error("sampler.chains must be at least 1, got $chains")
-
-    pilotval = get(prec, "pilot", "")
-    precond_pilot = (pilotval == "") ? nothing : String(pilotval)
-    refit_carry = get(prec, "refit_carry", "none")
-    refit_carry in ("none", "rescale", "keep") ||
-        error("precondition.refit_carry must be \"none\", \"rescale\" or \"keep\", got $(repr(refit_carry))")
-    (refit_carry != "none" && haskey(prec, "fixed_directions")) &&
-        error("precondition.fixed_directions needs refit_carry = \"none\"")
-    (refit_carry == "keep" && get(prec, "seed_transport", "") == "") &&
-        error("precondition.refit_carry = \"keep\" keeps the starting transform; set precondition.seed_transport")
-    refit_kind = get(prec, "refit_kind", "fisher")
-    refit_kind in ("fisher", "gauss_newton", "gauss_newton_support") || error(
-        "precondition.refit_kind must be \"fisher\", \"gauss_newton\" or \"gauss_newton_support\", got $(repr(refit_kind))"
+    nsample = Int(get(samp, "nsample", kinetic ? 1_000 : 10_000))
+    chunk_size = Int(get(samp, "chunk_size", algorithm == "walnuts" ? 10 : 100))
+    chunk_size >= 1 || error("sampler.chunk_size must be at least 1, got $chunk_size")
+    (algorithm == "walnuts" && nsample % chunk_size != 0) && error(
+        "sampler.nsample = $nsample must be a multiple of sampler.chunk_size = $chunk_size, " *
+            "the WALNUTS draws per block"
     )
-    support_cut = get(prec, "support_cut", 1.0e-2)
-    (support_cut isa Real && 0 < support_cut < 1) ||
-        error("precondition.support_cut must lie in (0, 1) (a fraction of the peak intensity), got $(repr(support_cut))")
-    haskey(prec, "support_cut") && refit_kind != "gauss_newton_support" &&
-        error("precondition.support_cut applies to refit_kind = \"gauss_newton_support\" only")
-    haskey(prec, "band_limit") && refit_kind == "gauss_newton_support" &&
-        error("precondition.band_limit restricts random probes; refit_kind = \"gauss_newton_support\" sets its own basis")
-    gn_keys = filter(
-        k -> haskey(prec, k),
-        [
-            "threshold", "oversample", "probes_per_draw", "band_limit", "residual_at",
-            "residual_draws", "residual_steps", "residual_directions", "residual_threshold",
-            "rescale", "rescale_n0", "rescale_bound",
-        ]
-    )
-    band_limit = get(prec, "band_limit", 3.0)
-    (band_limit isa Real && band_limit > 0) ||
-        error("precondition.band_limit must be a positive multiple of the longest baseline (inf for no limit), got $(repr(band_limit))")
-    inrun = haskey(prec, "refit_at") || get(prec, "refit_schedule", "manual") != "manual"
-    for key in ("max_wide", "rank_holdout", "rank_tol", "record_every", "stiff_core")
-        haskey(prec, key) && !inrun &&
-            error("precondition.$key applies to in-run refits; set refit_schedule or refit_at")
-    end
-    haskey(prec, "rank_tol") && !haskey(prec, "rank_holdout") &&
-        error("precondition.rank_tol needs precondition.rank_holdout")
-    get(prec, "stiff_core", false) && !use_reactant &&
-        error("precondition.stiff_core needs run.use_reactant = true")
-    if startswith(refit_kind, "gauss_newton")
-        use_reactant || error("precondition.refit_kind = \"gauss_newton\" needs run.use_reactant = true")
-        latent_space == "stdnormal" ||
-            error("precondition.refit_kind = \"gauss_newton\" needs run.latent_space = \"stdnormal\"")
-        haskey(prec, "rank") ||
-            error("precondition.refit_kind = \"gauss_newton\" needs precondition.rank (the most directions a fit keeps)")
-        refit_carry == "none" ||
-            error("precondition.refit_carry applies to Fisher refits; remove it for refit_kind = \"gauss_newton\"")
-        haskey(prec, "fixed_directions") &&
-            error("precondition.fixed_directions applies to Fisher refits; remove it for refit_kind = \"gauss_newton\"")
-        for key in ("max_wide", "rank_holdout", "rank_tol", "record_every", "stiff_core")
-            haskey(prec, key) &&
-                error("precondition.$key applies to Fisher refits; remove it for refit_kind = \"gauss_newton\"")
-        end
-        (haskey(prec, "refit_at") || get(prec, "refit_schedule", "manual") != "manual") ||
-            error("precondition.refit_kind = \"gauss_newton\" needs refit_schedule or refit_at")
-        get(prec, "pilot", "") == "" ||
-            error("precondition.pilot fits a Fisher transform; use seed_transport to start a \"gauss_newton\" run from a stored one")
-    else
-        isempty(gn_keys) ||
-            error("precondition.$(join(gn_keys, ", ")) apply to refit_kind = \"gauss_newton\" only")
-    end
     return FittingStrategy(;
         opt_method = opt_method,
         maxiters = Int(get(opt, "maxiters", 10_000)),
@@ -428,51 +270,21 @@ function build_fitting_config(cfg::AbstractDict)
         eta = Float64(get(opt, "eta", 0.001)),
         fix_scales = Symbol.(fix_scales),
         noise_schedule = Float64.(get(temp, "noise_schedule", [0.05, 0.025, 0.0])),
-        nsample = Int(get(samp, "nsample", algorithm == "mclmc" ? 1_000 : 10_000)),
-        nadapt = Int(get(samp, "nadapt", algorithm == "mclmc" ? 150_000 : 5_000)),
+        nsample,
+        nadapt = Int(get(samp, "nadapt", get(KINETIC_WARMUP, algorithm, 5_000))),
         step_size = Float64(get(samp, "step_size", 0.01)),
         target_accept = Float64(get(samp, "target_accept", 0.9)),
         init_buffer = Int(get(samp, "init_buffer", 200)),
         term_buffer = Int(get(samp, "term_buffer", 500)),
         max_tree_depth = Int(get(samp, "max_tree_depth", 10)),
-        chunk_size = Int(get(samp, "chunk_size", 100)),
-        adapt_mass_matrix = Bool(get(samp, "adapt_mass_matrix", true)),
-        diagonal,
+        chunk_size,
         moves,
         algorithm,
         chains,
         max_step_halvings = Int(get(samp, "max_step_halvings", 3)),
-        precond_pilot = precond_pilot,
-        precond_rank = Int(get(prec, "rank", 16)),
-        precond_nsamples = Int(get(prec, "nsamples", 2000)),
-        precond_discard = haskey(prec, "discard") ? Float64(prec["discard"]) : nothing,
-        precond_augment = Bool(get(prec, "augment", false)),
-        precond_refit_at = Float64.(get(prec, "refit_at", Float64[])),
-        precond_refit_schedule = String(get(prec, "refit_schedule", "manual")),
-        precond_refit_carry = refit_carry,
-        precond_max_wide = haskey(prec, "max_wide") ? Int(prec["max_wide"]) : nothing,
-        precond_stiff_core = Bool(get(prec, "stiff_core", false)),
-        precond_rank_holdout = Float64(get(prec, "rank_holdout", 0.0)),
-        precond_rank_tol = Float64(get(prec, "rank_tol", 0.05)),
-        precond_record_every = haskey(prec, "record_every") ? Int(prec["record_every"]) : nothing,
-        precond_refit_kind = refit_kind,
-        precond_threshold = Float64(get(prec, "threshold", 100.0)),
-        precond_oversample = Int(get(prec, "oversample", 10)),
-        precond_probes_per_draw = Int(get(prec, "probes_per_draw", 0)),
-        precond_band_limit = Float64(band_limit),
-        precond_support_cut = Float64(support_cut),
-        precond_residual_at = Float64.(get(prec, "residual_at", Float64[])),
-        precond_residual_draws = Int(get(prec, "residual_draws", 30)),
-        precond_residual_steps = Int(get(prec, "residual_steps", 25)),
-        precond_residual_directions = Int(get(prec, "residual_directions", 10)),
-        precond_residual_threshold = Float64(get(prec, "residual_threshold", 4.0)),
-        precond_rescale = Bool(get(prec, "rescale", false)),
-        precond_rescale_n0 = Float64(get(prec, "rescale_n0", 5.0)),
-        precond_rescale_bound = Float64(get(prec, "rescale_bound", 10.0)),
-        precond_seed_transport = String(get(prec, "seed_transport", "")),
-        precond_fixed_directions = String(get(prec, "fixed_directions", "")),
         latent_space = latent_space,
         use_reactant = use_reactant,
+        device,
         benchmark = Bool(get(run, "benchmark", true)),
         verify_reactant = Bool(get(run, "verify_reactant", false)),
         start = start,

@@ -101,8 +101,6 @@ end
 prepare_base(::NonCenteredMRF, grid, order) = standardize(MarkovRandomFieldGraph(grid; order); flag = Comrade.VLBISkyModels.FFTW.EXHAUSTIVE)
 prepare_base(ps::Union{Matern, MarkovRF}, grid, order) = SRF(ps, StationaryRandomFieldPlan(grid))
 
-markov_order(::MarkovRF{N}) where {N} = N
-
 """
     MaternSlopePS(ℓ, α)
 

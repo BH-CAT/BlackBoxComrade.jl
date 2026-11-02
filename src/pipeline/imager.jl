@@ -1,7 +1,7 @@
 # The imaging pipeline. `comrade_imager` runs the staged (noise-tempered) optimization and
-# then samples the posterior with either AdvancedHMC NUTS or Reactant NUTS, depending on
-# the `FittingStrategy`. Optimization always runs on the CPU/Enzyme posterior; for the
-# Reactant sampler a device posterior is built only for the sampling stage.
+# then samples the posterior with AdvancedHMC NUTS, Reactant NUTS, or KineticSamplers MCLMC or
+# WALNUTS, depending on the `FittingStrategy`. Optimization always runs on the CPU/Enzyme
+# posterior; the Reactant samplers build a device posterior for the sampling stage only.
 
 # The Optimisers.jl rules (Adam/AdamW) are shared by both backends: `comrade_opt` and
 # `reactant_opt`/`Optimisers.setup` all accept them. LBFGS (Optim.jl) is CPU-only.
@@ -19,15 +19,12 @@ function _select_optimizer(strategy::FittingStrategy)
     end
 end
 
-# Benchmarks run in the latent space actually sampled: with a preconditioner configured,
-# `maybe_transport` composes it in front of the flat transform, so its per-eval cost (and,
-# on the Reactant path, its traceability) is measured here rather than discovered at
-# sampling time.
-function _run_benchmarks(post, strategy, transport_method)
+# Benchmarks run in the latent space `space` the sampler uses.
+function _run_benchmarks(post, strategy, space)
     if strategy.use_reactant
-        return _run_reactant_benchmarks(post, transport_method)
+        return _run_reactant_benchmarks(post, space)
     end
-    tpost = Comrade.maybe_transport(post, transport_method)
+    tpost = Comrade.maybe_transport(post, space)
     x0 = randn(dimension(tpost))
     @info "Forward pass benchmark"
     show(IOContext(stdout), MIME("text/plain"), @benchmark logdensityof($tpost, $x0))
@@ -41,9 +38,9 @@ end
 # Benchmark the device forward pass and the Enzyme value+gradient used by `reactant_opt`.
 # The compiled programs execute synchronously and return concrete arrays, so `@benchmark`
 # of the call measures full device execution (compilation happens once, up front).
-function _run_reactant_benchmarks(post, transport_method)
+function _run_reactant_benchmarks(post, space)
     dpost = Comrade.prepare_device(post, Comrade.ComradeBase.ReactantEx())
-    tpost = Comrade.maybe_transport(dpost, Comrade._device_space(transport_method))
+    tpost = Comrade.maybe_transport(dpost, space)
     xr = Reactant.to_rarray(Comrade.inverse(tpost, prior_sample(Random.default_rng(), dpost)))
     fwd = Reactant.@compile sync = true logdensityof(tpost, xr)
     vg = Reactant.@compile sync = true _reactant_value_and_grad(tpost, xr)
@@ -172,9 +169,9 @@ function _load_start(path)
     return x
 end
 
-# The last draw of each chain `path/chain_k` of an MCLMC run, in chain order.
+# The last draw of each chain `path/chain_k` of an MCLMC or WALNUTS run, in chain order.
 function _last_draws(path)
-    return map(_mclmc_chain_dirs(path)) do dir
+    return map(_chain_dirs(path)) do dir
         ntot = deserialize(joinpath(dir, "parameters.jls")).params.nsamples
         only(Comrade.postsamples(load_samples(dir, ntot:ntot)))
     end
@@ -213,75 +210,8 @@ function _sample_ahmc(out, post, tpost, xopt, strategy, rng, restart, transport_
     return trace, (strategy.nadapt + 1):10:total
 end
 
-# The warmup metric strategy a fitting config asks for. A `[precondition]` refit schedule
-# selects a low-rank adaptor (Fisher or Gauss–Newton, per `refit_kind`), which refits the
-# latent space in-run and holds the metric at identity; without one the sampler's own
-# diagonal adaptation runs unless the config turned it off (as it must be when a fitted
-# transform is supplied up front, since diagonal adaptation renormalizes the marginals the
-# transform deliberately set). Gauss–Newton refits need `curvature`, the function
-# `gauss_newton_curvature` builds.
-function _metric_adaptor(strategy::FittingStrategy, curvature = nothing; rows = nothing, basis = nothing)
-    sched = if strategy.precond_refit_schedule == "stan"
-        :stan
-    elseif strategy.precond_refit_schedule == "nutpie"
-        :nutpie
-    elseif !isempty(strategy.precond_refit_at)
-        strategy.precond_refit_at
-    else
-        nothing
-    end
-    isnothing(sched) && return strategy.adapt_mass_matrix ?
-        Comrade.WelfordDiagonal() : Comrade.FixedMetric()
-    if startswith(strategy.precond_refit_kind, "gauss_newton")
-        isnothing(curvature) && throw(ArgumentError("Gauss–Newton refits need a curvature function"))
-        k = strategy.precond_rank + strategy.precond_oversample
-        return Comrade.GaussNewtonLowRank(
-            curvature; rank = strategy.precond_rank, oversample = strategy.precond_oversample,
-            probes_per_draw = strategy.precond_probes_per_draw == 0 ? k : strategy.precond_probes_per_draw,
-            threshold = strategy.precond_threshold, schedule = sched, rows, basis,
-            residual_at = strategy.precond_residual_at,
-            residual_draws = strategy.precond_residual_draws,
-            residual_steps = strategy.precond_residual_steps,
-            residual_directions = strategy.precond_residual_directions,
-            residual_threshold = strategy.precond_residual_threshold,
-            rescale = strategy.precond_rescale ?
-                Comrade.NutpieDiagonal(; n0 = strategy.precond_rescale_n0, bound = strategy.precond_rescale_bound) :
-                nothing
-        )
-    end
-    return Comrade.FisherLowRank(;
-        rank = strategy.precond_rank, schedule = sched,
-        _given(:discard, strategy.precond_discard)...,
-        carry = Symbol(strategy.precond_refit_carry), _given(:max_wide, strategy.precond_max_wide)...,
-        holdout = strategy.precond_rank_holdout, rank_tol = strategy.precond_rank_tol,
-        _given(:record_every, strategy.precond_record_every)...,
-        fixed = isempty(strategy.precond_fixed_directions) ? nothing : _fixed_directions(strategy),
-        stiff = strategy.precond_stiff_core ? Comrade.StiffCore() : nothing
-    )
-end
-
 # A keyword argument when the config set it, so the callee's default applies otherwise.
 _given(key::Symbol, value) = isnothing(value) ? (;) : NamedTuple{(key,)}((value,))
-
-# The fixed directions and standard deviations stored for Fisher refits.
-function _fixed_directions(strategy::FittingStrategy)
-    path = strategy.precond_fixed_directions
-    f = deserialize(path)
-    (f isa NamedTuple && haskey(f, :directions) && haskey(f, :sd)) ||
-        error("precondition.fixed_directions $path must hold a NamedTuple (; directions, sd), got a $(typeof(f))")
-    return (f.directions, f.sd)
-end
-
-# A stored preconditioner to seed warmup from; it must act in the run's latent space.
-function _seed_transport(strategy::FittingStrategy)
-    t = deserialize(strategy.precond_seed_transport)
-    want = strategy.latent_space == "flat" ? Comrade.LowRankPreconditioner : Comrade.Preconditioned
-    t isa want || error(
-        "precondition.seed_transport $(strategy.precond_seed_transport) holds a $(nameof(typeof(t))); " *
-            "run.latent_space = \"$(strategy.latent_space)\" needs a $(nameof(want))"
-    )
-    return t
-end
 
 # The paths of the non-finite entries of a constrained parameter point, with the first
 # offending value of each array.
@@ -303,7 +233,7 @@ function _check_finite_draw(x, where)
 end
 
 # Leapfrog steps per draw over a chunk of `nsteps` NUTS draws that took `nuts_seconds` on the
-# device (the NUTS kernel alone, without moves, refits or checkpoints), divided by the
+# device (the NUTS kernel alone, without moves or checkpoints), divided by the
 # steady-state time `tgrad` of one gradient. Empty without `tgrad`, or for a chunk that ran a
 # freshly compiled kernel (`fresh`), whose first run pays one-time device setup. With
 # `maxdepth`, a mean of at least 95% of the `2^maxdepth − 1` leapfrog steps of a full tree is
@@ -327,27 +257,15 @@ function _sample_reactant(out, post, xopt, strategy, restart, gimg, imgbase, tra
     # its own gradients. This avoids rebuilding the instrument Jones matrices / FFT plans.
     post_cpu = @set post.admode = nothing
     rpost = Comrade.prepare_device(post_cpu, Comrade.ComradeBase.ReactantEx())
-    curvature = startswith(strategy.precond_refit_kind, "gauss_newton") ?
-        gauss_newton_curvature(GaussNewtonKernels(post_cpu, rpost)) : nothing
-    basis = strategy.precond_refit_kind == "gauss_newton_support" ?
-        support_basis(post_cpu, strategy.precond_support_cut) : nothing
-    rows = strategy.precond_refit_kind == "gauss_newton" ?
-        gauss_newton_rows(post_cpu, strategy.precond_band_limit) : nothing
-    isnothing(rows) || @info "Gauss–Newton directions on $(length(rows)) of " *
-        "$(dimension(Comrade.transport_to(post_cpu, PT.StdNormal()))) latent coordinates " *
-        "(sky-field modes up to $(strategy.precond_band_limit) × the longest baseline)"
-    adaptor = _metric_adaptor(strategy, curvature; rows, basis)
     moves = isempty(strategy.moves) ? nothing : build_moves(
             post_cpu, strategy.moves, xopt;
             space = latent_space(strategy), output = joinpath(mkpath(out), "moves.jls")
         )
     isnothing(moves) || @info "Moves between NUTS chunks (proposals per call): " *
-        join(("$(Comrade.move_name(m)) ×$r" for (m, r) in zip(moves.moves, moves.rounds)), ", ")
+        join(("$(m.name) ×$(m.rounds)" for m in move_summary(moves)), ", ")
     smplr = Comrade.ReactantNUTS(;
         n_adapts = strategy.nadapt, init_step_size = strategy.step_size,
-        max_tree_depth = strategy.max_tree_depth,
-        metric_adaptor = adaptor,
-        diagonal = strategy.diagonal == "nutpie" ? Comrade.NutpieDiagonal() : nothing
+        max_tree_depth = strategy.max_tree_depth
     )
 
     # `sample_checkpoint` sets the sampling DiskStore stride (= batch / checkpoint frequency,
@@ -387,16 +305,6 @@ function _sample_reactant(out, post, xopt, strategy, restart, gimg, imgbase, tra
             @info "warmup $(info.step)/$(info.total): step_size=$(info.step_size)$note (checkpoint saved)"
             _flush_logs()
             return (; info.step, info.total, info.step_size)
-        end
-        # nutpie-style init: with in-run refits configured and no pilot transform, one
-        # score at the start point sets the initial diagonal metric, so warmup's first
-        # segment starts pre-scaled instead of on a unit metric.
-        if adaptor isa Comrade.FisherLowRank && transport_method isa Union{Nothing, PT.StdNormal} &&
-                !restart && !isnothing(xopt)
-            @info "Initializing transform from the start point's score (nutpie-style)"
-            transport_method = Comrade._score_init_pre(
-                post, xopt; reactant = true, space = latent_space(strategy)
-            )
         end
         # The sampling DiskStore records wall time per draw; with the cost of one gradient
         # stored next to it, leapfrog steps per draw (and so tree depth) can be recovered
@@ -443,7 +351,7 @@ function check_start(post, space, x)
     ℓ = logdensityof(tpost, u)
     isfinite(ℓ) && return ℓ
     bad = String[]
-    _nonfinite_paths!(bad, "", latent_layout(tpost), u)
+    _nonfinite_paths!(bad, "", PT.transport_node(tpost.transform), u)
     where_ = isempty(bad) ? "every latent coordinate is finite" :
         "non-finite latent coordinates in " * join(bad, ", ")
     return error(
@@ -452,13 +360,14 @@ function check_start(post, space, x)
     )
 end
 
-function _nonfinite_paths!(bad, prefix, node, u)
-    if node isa AbstractRange
-        all(isfinite, view(u, node)) || push!(bad, isempty(prefix) ? "(all)" : prefix)
-    else
-        for (k, v) in pairs(node)
-            _nonfinite_paths!(bad, isempty(prefix) ? string(k) : "$prefix.$k", v, u)
+function _nonfinite_paths!(bad, prefix, t, u, offset = 0)
+    if t isa PT.TupleTransport
+        for (k, c) in pairs(getfield(t, :transports))
+            _nonfinite_paths!(bad, isempty(prefix) ? string(k) : "$prefix.$k", c, u, offset)
+            offset += PT.dimension(c)
         end
+    else
+        all(isfinite, view(u, offset .+ (1:PT.dimension(t)))) || push!(bad, isempty(prefix) ? "(all)" : prefix)
     end
     return bad
 end
@@ -468,9 +377,9 @@ end
                    rng=Random.default_rng(), restart=false)
 
 Run the full imaging pipeline: staged noise-tempered optimization (or restart/start),
-save the optimal image + caltables, then sample the posterior (AdvancedHMC or Reactant
-NUTS per `strategy`) and write posterior FITS draws. Returns the path the run was written
-to.
+save the optimal image + caltables, then sample the posterior (AdvancedHMC NUTS, Reactant
+NUTS, MCLMC or WALNUTS per `strategy`) and write posterior FITS draws. Returns the path the
+run was written to.
 
 `restart=true` loads the serialized optimum at `outbase` instead of re-optimizing. Sampling
 resumes from the checkpoint at `outbase` when one was started (it holds `transport.jls`, the
@@ -483,6 +392,10 @@ function comrade_imager(
         restart::Bool = false
     )
     @info "Imaging output base: $outbase"
+    if strategy.use_reactant
+        isnothing(strategy.device) || Reactant.set_default_backend(strategy.device)
+        @info "Reactant devices: $(join(string.(Reactant.devices()), ", "))"
+    end
     mkpath(dirname(outbase))
     outimg = mkpath(joinpath(dirname(outbase), "images"))
     out = outbase
@@ -513,34 +426,11 @@ function comrade_imager(
         )
     end
 
-    # The preconditioner participates in every log-density evaluation, so it is fit
-    # before benchmarking. `sample` persists it to `<out>/transport.jls`; a restart that
-    # resumes the sampler reuses that space, so refitting is skipped (a resumed run with a
-    # pilot configured would otherwise warn and be ignored).
+    # `sample` records the latent space in `<out>/transport.jls`, which a resumed sampler
+    # reads back (`transport_method = nothing`).
     resume = _resume_sampler(out, restart)
-    transport_method = if resume
-        nothing
-    elseif !isempty(strategy.precond_seed_transport)
-        isnothing(strategy.precond_pilot) ||
-            error("precondition.pilot and precondition.seed_transport are exclusive; set one")
-        @info "Seeding transform from $(strategy.precond_seed_transport)"
-        _seed_transport(strategy)
-    elseif isnothing(strategy.precond_pilot)
-        latent_space(strategy)
-    else
-        @info "Fitting latent-space preconditioner from pilot run $(strategy.precond_pilot)"
-        fit_preconditioner(
-            strategy.precond_pilot, post;
-            rank = strategy.precond_rank, nsamples = strategy.precond_nsamples,
-            _given(:discard, strategy.precond_discard)..., augment = strategy.precond_augment,
-            space = latent_space(strategy),
-            # tune gradients on the same backend the run samples on
-            grad_reactant = strategy.use_reactant
-        )
-    end
-
-    bench_space = isnothing(transport_method) ? latent_space(strategy) : transport_method
-    tgrad = strategy.benchmark ? _run_benchmarks(post, strategy, bench_space) : nothing
+    transport_method = resume ? nothing : latent_space(strategy)
+    tgrad = strategy.benchmark ? _run_benchmarks(post, strategy, latent_space(strategy)) : nothing
 
     g = post.skymodel.grid.imgdomain
     gimg = refinespatial(g, 2)
@@ -555,8 +445,9 @@ function comrade_imager(
     elseif !isnothing(strategy.start)
         loaded = _load_start(strategy.start)
         if loaded isa AbstractVector
-            strategy.algorithm == "mclmc" || error(
-                "run.start $(strategy.start) is an MCLMC run, whose chains start only sampler.algorithm = \"mclmc\""
+            strategy.algorithm in KINETIC_ALGORITHMS || error(
+                "run.start $(strategy.start) holds the chains of an MCLMC or WALNUTS run, which " *
+                    "start only sampler.algorithm = \"mclmc\" or \"walnuts\""
             )
             starts, xopt = loaded, first(loaded)
         else
@@ -583,8 +474,8 @@ function comrade_imager(
         isnothing(starts) || (starts = [first(unwrap_phase_chains(post, s)) for s in starts])
     end
     foreach(x -> check_start(post, latent_space(strategy), x), something(starts, [xopt]))
-    chain = if strategy.algorithm == "mclmc"
-        sample_mclmc(out, post, xopt, strategy, rng; starts)
+    chain = if strategy.algorithm in KINETIC_ALGORITHMS
+        sample_kinetic(out, post, xopt, strategy, rng; starts)
     elseif strategy.use_reactant
         load_samples(_sample_reactant(out, post, xopt, strategy, resume, gimg, imgbase, transport_method, tgrad)...)
     else

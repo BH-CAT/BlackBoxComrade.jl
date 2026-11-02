@@ -55,7 +55,7 @@ end
 
 Pkg.activate(@__DIR__)
 update_reactant_pref!(GPU_MODE)
-@info "Instantiating the BlackBoxComrade environment (this may take a moment)..."
+@info "Instantiating the BlackboxComrade environment (this may take a moment)..."
 Pkg.instantiate()
 
 Pkg.activate(joinpath(@__DIR__, "drivers"))
