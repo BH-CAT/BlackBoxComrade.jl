@@ -1,9 +1,8 @@
 name: Register Package
 # Registers the version in Project.toml in BH-CAT/BHCATRegistry, then tags and releases it.
-# A "/register" comment from someone with write access starts it: on a commit it registers
-# that commit, on an issue or pull request the head of the default branch.
+# A "/register" comment on an issue or pull request from someone with write access starts
+# it, and it registers the head of the default branch.
 on:
-  commit_comment:
   issue_comment:
     types: [created]
   workflow_dispatch:
@@ -27,14 +26,7 @@ jobs:
             admin|maintain|write) ;;
             *) echo "::error::$COMMENTER has $permission access; registering needs write access"; exit 1 ;;
           esac
-      - name: Choose the commit
-        id: commit
-        env:
-          COMMENTED_COMMIT: ${{ github.event.comment.commit_id }}
-        run: echo "sha=${COMMENTED_COMMIT:-$GITHUB_SHA}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ steps.commit.outputs.sha }}
       - uses: julia-actions/setup-julia@v3
         with:
           version: '1'
@@ -66,14 +58,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "v${{ steps.register.outputs.version }}" \
-            --target "${{ steps.commit.outputs.sha }}" --generate-notes
+            --target "$GITHUB_SHA" --generate-notes
       - name: Reply to the comment
         if: always() && github.event_name != 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STATUS: ${{ job.status }}
           VERSION: ${{ steps.register.outputs.version }}
-          COMMIT: ${{ steps.commit.outputs.sha }}
           ISSUE: ${{ github.event.issue.number }}
         run: |
           if [ "$STATUS" = success ]; then
@@ -81,8 +72,4 @@ jobs:
           else
             body="Registration failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           fi
-          if [ -n "$ISSUE" ]; then
-            gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" -f body="$body"
-          else
-            gh api "repos/$GITHUB_REPOSITORY/commits/$COMMIT/comments" -f body="$body"
-          fi
+          gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" -f body="$body"
