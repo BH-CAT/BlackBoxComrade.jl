@@ -32,11 +32,13 @@ See [`examples/`](examples) for annotated configs.
 BlackboxComrade needs Julia 1.12 or later, which
 [juliaup](https://github.com/JuliaLang/juliaup) installs.
 
-It depends on [KineticSamplers.jl](https://github.com/BH-CAT/KineticSamplers.jl), which is
-private and registered in the private BH-CAT registry,
-[BHCATRegistry](https://github.com/BH-CAT/BHCATRegistry). Installing it needs read access to
-both repositories and Git credentials that Pkg can use. One way is the GitHub CLI as Git's
-credential helper, with Pkg running the system `git`:
+BlackboxComrade and its dependency
+[KineticSamplers.jl](https://github.com/BH-CAT/KineticSamplers.jl) are registered in
+[BHCATRegistry](https://github.com/BH-CAT/BHCATRegistry), the BH-CAT registry, and both
+KineticSamplers and the registry are private. Members of the [BH-CAT](https://github.com/BH-CAT)
+GitHub organization can read all of its repositories; to get access, ask an organization
+owner to invite you. Pkg also needs Git credentials it can use. One way is the GitHub CLI as
+Git's credential helper, with Pkg running the system `git`:
 
 ```bash
 gh auth login
@@ -50,7 +52,7 @@ the app:
 
 ```julia-repl
 pkg> registry add https://github.com/BH-CAT/BHCATRegistry.git
-pkg> app add https://github.com/BH-CAT/BlackboxComrade.jl
+pkg> app add BlackboxComrade
 ```
 
 This puts `bbcomrade` in `~/.julia/bin`, which must be on your `PATH`; `bbcomrade --help`
