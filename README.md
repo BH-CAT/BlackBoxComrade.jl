@@ -68,7 +68,8 @@ drivers it can choose the AMD (ROCm) build; to force CUDA, create
 gpu = "cuda"
 ```
 
-and run `bbcomrade --help` once to recompile.
+and run `bbcomrade --help` once to recompile. `pkg> app update` deletes this file, so create it
+again after each update.
 
 ## Running
 
