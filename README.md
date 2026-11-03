@@ -108,7 +108,7 @@ See [`CLAUDE.md`](CLAUDE.md) for the source layout and architecture.
 
 ## Releasing
 
-Bump `version` in `Project.toml` and merge it. Then comment `/register` on the commit to
-release, or on any issue or pull request to release the head of `main`. The Register
-workflow checks that the commenter has write access, registers the version in BHCATRegistry,
-creates the `vX.Y.Z` release and replies with the result.
+Bump `version` in `Project.toml` and merge it. Then comment `/register` on any issue or pull
+request to release the head of `main`. The Register workflow checks that the commenter has
+write access, registers the version in BHCATRegistry, creates the `vX.Y.Z` release and
+replies with the result.
