@@ -59,6 +59,17 @@ This puts `bbcomrade` in `~/.julia/bin`, which must be on your `PATH`; `bbcomrad
 checks the installation. `pkg> app update bbcomrade` updates it and `pkg> app rm bbcomrade`
 removes it. For a local checkout, use `pkg> app develop path/to/BlackboxComrade` instead.
 
+Reactant chooses its GPU build when it is compiled. On a machine with both NVIDIA and AMD
+drivers it can choose the AMD (ROCm) build; to force CUDA, create
+`~/.julia/environments/apps/BlackboxComrade/LocalPreferences.toml` containing
+
+```toml
+[Reactant_jll]
+gpu = "cuda"
+```
+
+and run `bbcomrade --help` once to recompile.
+
 ## Running
 
 ```bash

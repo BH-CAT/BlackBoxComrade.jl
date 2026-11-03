@@ -1,6 +1,6 @@
 name = "BlackboxComrade"
 uuid = "5bd28f6b-d16a-4ecc-8550-9c719f2b7021"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Paul Tiede <ptiede91@gmail.com> and contributors"]
 
 [deps]
@@ -41,9 +41,6 @@ TransformVariables = "84d833dd-6860-57f9-a1a7-6da5db126cff"
 VLBIFiles = "c1ebf4c8-f9d4-409a-8daf-7009448f4e6e"
 VLBIImagePriors = "b1ba175b-8447-452c-b961-7db2d6f7a029"
 VLBISkyModels = "d6343c73-7174-4e0f-bb64-562643efbeca"
-
-[sources]
-Comrade = {rev = "ptiede-statespaceint", url = "https://github.com/ptiede/Comrade.jl"}
 
 [compat]
 ADTypes = "1.19"
@@ -88,6 +85,7 @@ julia = "1.12"
 [apps.bbcomrade]
 
 [extras]
+Reactant_jll = "0192cb87-2b54-54ad-80e0-3be72ad8a3c0"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
