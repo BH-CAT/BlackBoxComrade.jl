@@ -22,17 +22,20 @@ step_size = 0.01
 target_accept = 0.9   # AdvancedHMC only, like init_buffer and term_buffer
 init_buffer = 200
 term_buffer = 500
-# algorithm = "mclmc"   # KineticSamplers MCLMC (needs run.use_reactant and
-#                        # run.latent_space = "stdnormal"): nadapt is warmup gradients per
-#                        # chain (default 150000), nsample draws per chain (default 1000),
-#                        # one per chunk_size steps; drop step_size and max_tree_depth
-# chains = 4             # MCLMC only
+# algorithm = "mclmc"   # KineticSamplers MCLMC or "walnuts" (both need run.use_reactant):
+#                        # nadapt is warmup steps (MCLMC, default 150000) or draws
+#                        # (WALNUTS, default 1000) per chain, nsample draws per chain
+#                        # (default 1000);
+#                        # MCLMC keeps one draw per chunk_size steps, WALNUTS every draw in
+#                        # blocks of chunk_size draws (default 10, must divide nsample).
+#                        # Drop step_size, and for MCLMC also max_tree_depth.
+# chains = 4             # MCLMC and WALNUTS only
 # max_step_halvings = 3  # MCLMC only
 # reactant-only knobs:
-max_tree_depth = 10
+max_tree_depth = 10      # also WALNUTS's most trajectory doublings
 chunk_size = 100
 
-# Metropolis–Hastings moves between the Reactant NUTS chunks, one [[sampler.moves]] table
+# Metropolis–Hastings moves between the sampler's chunks or blocks, one [[sampler.moves]] table
 # per move kind: "flux_gain" (total flux against a common gain amplitude), "field_scale"
 # (each non-centered sky field against its scale), "rho_field" (each Markov RF correlation
 # length against its field), "mean_field" (each mean-model parameter against the
@@ -46,6 +49,7 @@ chunk_size = 100
 
 [run]
 use_reactant = false
+# device = "gpu"        # Reactant only: "cpu" or "gpu" (default: a GPU when available)
 benchmark = true
 sample_checkpoint = 0   # Reactant only: render a checkpoint (FITS + PNG + residuals) every N
                         # sampling samples (also the sampling disk stride). 0 disables it.

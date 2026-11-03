@@ -1,4 +1,4 @@
-name = "BlackBoxComrade"
+name = "BlackboxComrade"
 uuid = "5bd28f6b-d16a-4ecc-8550-9c719f2b7021"
 version = "0.1.0"
 authors = ["Paul Tiede <ptiede91@gmail.com> and contributors"]
@@ -44,7 +44,6 @@ VLBISkyModels = "d6343c73-7174-4e0f-bb64-562643efbeca"
 
 [sources]
 Comrade = {rev = "ptiede-statespaceint", url = "https://github.com/ptiede/Comrade.jl"}
-KineticSamplers = {rev = "main", url = "https://github.com/BH-CAT/KineticSamplers.jl"}
 
 [compat]
 ADTypes = "1.19"
@@ -54,7 +53,7 @@ AstroTime = "0.7"
 BenchmarkTools = "1"
 CSV = "0.10"
 CairoMakie = "0.15.11"
-Comrade = "0.11"
+Comrade = "0.11.34"
 ComradeBase = "0.9.19"
 ConstructionBase = "1"
 DataFrames = "1"

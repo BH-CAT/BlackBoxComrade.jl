@@ -1,4 +1,4 @@
-module BlackBoxComrade
+module BlackboxComrade
 
 using Reexport
 @reexport using Comrade
@@ -69,11 +69,9 @@ include("config/fitting_config.jl")
 include("pipeline/output.jl")
 include("pipeline/fixed_scales.jl")
 include("pipeline/reactant_opt.jl")
-include("pipeline/gauss_newton.jl")
 include("pipeline/phase_chains.jl")
 include("pipeline/moves.jl")
-include("pipeline/pnc_moves.jl")
-include("pipeline/mclmc.jl")
+include("pipeline/kinetic.jl")
 include("pipeline/imager.jl")
 include("pipeline/run.jl")
 include("cli.jl")

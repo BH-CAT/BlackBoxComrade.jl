@@ -102,6 +102,7 @@ end
 _reshaped(v, w) = reshape(vec(w), size(v))
 
 # --- builders by kind ---------------------------------------------------------------------
+# Each returns the moves and their initial step scales (`nothing` for a move without one).
 
 function _flux_gain_moves(post, view, θ, spec)
     isnothing(spec.params) ||
@@ -124,12 +125,8 @@ function _flux_gain_moves(post, view, θ, spec)
         )
         (:instrument, :lg1)
     end
-    return [
-        Comrade.flux_gain_move(
-            view; flux = (:sky, :flux, :ftot), gains,
-            initial_scale = something(spec.initial_scale, 0.05)
-        ),
-    ]
+    return [Comrade.flux_gain_move(view; flux = (:sky, :flux, :ftot), gains)],
+        [something(spec.initial_scale, 0.05)]
 end
 
 """
@@ -153,22 +150,23 @@ function _field_scale_moves(post, view, θ, spec)
         "move \"field_scale\" found no non-centered field (an array `X` with a scalar " *
             "scale `σX`) among the sky parameters $(keys(θ.sky))"
     )
-    return map(fields) do f
+    moves_scales = map(fields) do f
         path = _white_field(view, f)
         spath = (:sky, Symbol(:σ, f))
         logratio(x, x′, ctx) = log(Comrade.value(ctx.view, x, spath) / Comrade.value(ctx.view, x′, spath))
         mask = _band_mask(post, θ, f, spec.band_limit, "field_scale")
         key = Symbol(:field_scale_mask_, f)
         nc = sum(mask)
-        Comrade.CompensatedMove(
+        move = Comrade.CompensatedMove(
             "field_scale[$f]", view, spath, path,
             (vX, x, x′, ctx) -> vX .* exp.(_reshaped(vX, getfield(ctx, key)) .* logratio(x, x′, ctx));
             logdet = (vX, x, x′, ctx) -> nc * logratio(x, x′, ctx),
-            initial_scale = something(spec.initial_scale, 2.4 / sqrt(2nc)),
-            invariant = isinf(spec.band_limit), context = NamedTuple{(key,)}((mask,)),
+            likelihood_invariant = isinf(spec.band_limit), context = NamedTuple{(key,)}((mask,)),
             traceable = true
         )
+        move, something(spec.initial_scale, 2.4 / sqrt(2nc))
     end
+    return first.(moves_scales), last.(moves_scales)
 end
 
 """
@@ -197,7 +195,7 @@ function _rho_field_moves(post, view, θ, spec)
         "move \"rho_field\" found no field `X` with a scale `σX` and spectral parameters " *
             "`ρX` among the sky parameters $(keys(θ.sky))"
     )
-    return mapreduce(vcat, fields) do f
+    moves = mapreduce(vcat, fields) do f
         path = _white_field(view, f)
         rpath = (:sky, Symbol(:ρ, f))
         nterms = length(θ.sky[rpath[2]])
@@ -212,12 +210,12 @@ function _rho_field_moves(post, view, θ, spec)
                 "rho_field[$f,$n]", view, rpath, path,
                 (vX, x, x′, ctx) -> vX .* _reshaped(vX, exp.(dla(x, x′, ctx)));
                 index = n, logdet = (vX, x, x′, ctx) -> sum(dla(x, x′, ctx)),
-                initial_scale = something(spec.initial_scale, 0.05),
-                invariant = isinf(spec.band_limit), context = merge((; k2), NamedTuple{(key,)}((mask,))),
-                traceable = true
+                likelihood_invariant = isinf(spec.band_limit),
+                context = merge((; k2), NamedTuple{(key,)}((mask,))), traceable = true
             )
         end
     end
+    return moves, fill(something(spec.initial_scale, 0.05), length(moves))
 end
 
 """
@@ -253,15 +251,16 @@ function _mean_field_moves(post, view, θ, spec)
         Δ = _hartley((logmean(x, ctx) .- logmean(x′, ctx)) ./ σ) .* exp.(.-la) ./ sqrt(length(la))
         return va .+ _reshaped(va, Δ)
     end
-    return map(params) do p
+    moves = map(params) do p
         mpath = (:sky, :mean, p)
         length(Comrade.coords(view, mpath)) == 1 ||
             error("mean-model parameter $p does not have one latent coordinate")
         Comrade.CompensatedMove(
             "mean_field[$p]", view, mpath, path, compensate;
-            initial_scale = something(spec.initial_scale, 0.01), context = (; k2), traceable = true
+            likelihood_invariant = true, context = (; k2), traceable = true
         )
     end
+    return moves, fill(something(spec.initial_scale, 0.01), length(moves))
 end
 
 function _phase_sheet_moves(post, view, θ, spec)
@@ -271,7 +270,7 @@ function _phase_sheet_moves(post, view, θ, spec)
     isempty(terms) && error(
         "move \"phase_sheet\" needs a real-line Gauss–Markov phase chain among $(PHASE_CHAIN_TERMS); the model has none"
     )
-    return [Comrade.PhaseSheetMove(post, Tuple(terms); space = Comrade.space(view))]
+    return [Comrade.PhaseSheetMove(post, Tuple(terms); space = Comrade.space(view))], [nothing]
 end
 
 """
@@ -287,17 +286,14 @@ function _chain_hyper_moves(post, view, θ, spec)
         "move \"chain_hyper\" needs an instrument Gauss–Markov chain with fitted " *
             "hyperparameters; the instrument parameters are $(keys(θ.instrument))"
     )
-    return mapreduce(vcat, terms) do t
-        Comrade.chain_hyper_moves(view, (:instrument, t); initial_scale = something(spec.initial_scale, 0.1))
-    end
+    moves = mapreduce(t -> Comrade.chain_hyper_moves(view, (:instrument, t)), vcat, terms)
+    return moves, fill(something(spec.initial_scale, 0.1), length(moves))
 end
 
 const _MOVE_BUILDERS = Dict(
     "flux_gain" => _flux_gain_moves,
     "field_scale" => _field_scale_moves,
     "rho_field" => _rho_field_moves,
-    "pnc_field" => (args...) -> _pnc_field_moves(args...),
-    "pnc_orbit" => (args...) -> _pnc_orbit_moves(args...),
     "mean_field" => _mean_field_moves,
     "phase_sheet" => _phase_sheet_moves,
     "chain_hyper" => _chain_hyper_moves,
@@ -313,8 +309,9 @@ The moves the [`MoveSpec`](@ref)s `specs` describe for `post` in the latent spac
 parameter (`"mean_field"`); `"flux_gain"` is `Comrade.flux_gain_move` on `sky.flux.ftot`
 and `instrument.lg1`, `"phase_sheet"` is one `Comrade.PhaseSheetMove` over the
 real-line phase chains (`$(PHASE_CHAIN_TERMS)`), and `"chain_hyper"` expands to one
-`Comrade.ChainHyperMove` per chain term and hyperparameter field. Each move takes its spec's `rounds` and
-`target_accept`; `output` is where the `MoveSet` writes its statistics.
+`Comrade.ChainHyperMove` per chain term and hyperparameter field. Each move takes its spec's
+`rounds`, `target_accept` and `initial_scale` (default per kind); `output` is where the
+`MoveSet` writes its statistics.
 
 Errors if a move does not apply to the model, or if at `θ0` (a constrained parameter point
 of `post`) a move that should leave the likelihood unchanged does not.
@@ -322,14 +319,15 @@ of `post`) a move that should leave the likelihood unchanged does not.
 function build_moves(post::VLBIPosterior, specs, θ0; space = nothing, output = nothing)
     θ0 = Comrade.Adapt.adapt(Array, θ0)
     view = Comrade.CoordinateView(post, space)
-    moves, rounds, target_accept = Comrade.AbstractMove[], Int[], Float64[]
+    moves, rounds, target_accept, initial_scale = Comrade.AbstractMove[], Int[], Float64[], Any[]
     for spec in specs
         haskey(_MOVE_BUILDERS, spec.kind) ||
             error("unknown move kind \"$(spec.kind)\". Allowed: $(collect(MOVE_KINDS))")
-        ms = _MOVE_BUILDERS[spec.kind](post, view, θ0, spec)
+        ms, scales = _MOVE_BUILDERS[spec.kind](post, view, θ0, spec)
         append!(moves, ms)
+        append!(initial_scale, scales)
         append!(rounds, fill(spec.rounds, length(ms)))
         append!(target_accept, fill(spec.target_accept, length(ms)))
     end
-    return Comrade.MoveSet(post, moves; space, θ0, rounds, target_accept, output)
+    return Comrade.MoveSet(post, moves; space, θ0, rounds, initial_scale, target_accept, output)
 end

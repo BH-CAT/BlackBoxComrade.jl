@@ -222,8 +222,8 @@ end
     load_chain_and_post(file, nsamples=:; warmup=false) -> (chain, post)
 
 Reload a saved chain and its posterior (see [`load_posterior`](@ref)). The chains of an MCLMC
-run, `<file>/chain_k`, load as draws × chains (see [`load_mclmc_chains`](@ref)), with
-`nsamples` selecting draws of each chain.
+or WALNUTS run, `<file>/chain_k`, load as draws × chains (see [`load_kinetic_chains`](@ref)),
+with `nsamples` selecting draws of each chain.
 
 `warmup=true` loads the warmup (adaptation) chain from `<file>/warmup` instead of the
 posterior chain. The ReactantNUTS sampler writes that log as warmup runs — one draw per
@@ -241,7 +241,7 @@ function load_chain_and_post(file, nsamples = Base.Colon(); warmup::Bool = false
     dir = warmup ? joinpath(file, "warmup") : file
     if !warmup && !isfile(joinpath(abspath(file), "parameters.jls")) &&
             isfile(joinpath(abspath(file), "chain_1", "parameters.jls"))
-        return load_mclmc_chains(file, nsamples), load_posterior(file)
+        return load_kinetic_chains(file, nsamples), load_posterior(file)
     end
     if !isfile(joinpath(abspath(dir), "parameters.jls"))
         # The usual cause is calling this mid-warmup: the sampling chain has not been

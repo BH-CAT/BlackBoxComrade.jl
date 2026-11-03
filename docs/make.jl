@@ -1,14 +1,14 @@
-using BlackBoxComrade
+using BlackboxComrade
 using Documenter
 
-DocMeta.setdocmeta!(BlackBoxComrade, :DocTestSetup, :(using BlackBoxComrade); recursive = true)
+DocMeta.setdocmeta!(BlackboxComrade, :DocTestSetup, :(using BlackboxComrade); recursive = true)
 
 makedocs(;
-    modules = [BlackBoxComrade],
+    modules = [BlackboxComrade],
     authors = "Paul Tiede <ptiede91@gmail.com> and contributors",
-    sitename = "BlackBoxComrade.jl",
+    sitename = "BlackboxComrade.jl",
     format = Documenter.HTML(;
-        canonical = "https://bh-cat.github.io/BlackBoxComrade.jl",
+        canonical = "https://bh-cat.github.io/BlackboxComrade.jl",
         edit_link = "main",
         assets = String[],
     ),
@@ -18,6 +18,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo = "github.com/BH-CAT/BlackBoxComrade.jl",
+    repo = "github.com/BH-CAT/BlackboxComrade.jl",
     devbranch = "main",
 )

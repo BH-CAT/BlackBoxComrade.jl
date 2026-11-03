@@ -3,6 +3,6 @@
 using Pkg
 Pkg.activate(@__DIR__)
 
-using BlackBoxComrade
+using BlackboxComrade
 
-BlackBoxComrade.bbcomrade(ARGS)
+BlackboxComrade.bbcomrade(ARGS)

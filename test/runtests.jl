@@ -1,4 +1,4 @@
-using BlackBoxComrade
+using BlackboxComrade
 using Test
 using TOML
 using Random
@@ -10,18 +10,18 @@ import Enzyme
 const EXDIR = normpath(joinpath(@__DIR__, "..", "examples"))
 exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
-@testset "BlackBoxComrade.jl" begin
+@testset "BlackboxComrade.jl" begin
 
     @testset "a draw with non-finite parameters is an error" begin
         good = (sky = (σa = 1.0, ρa = (2.0, 3.0), a = ones(2, 2)), instrument = (lg = [0.1, 0.2],))
-        @test BlackBoxComrade._check_finite_draw(good, "warmup step 10") === good
+        @test BlackboxComrade._check_finite_draw(good, "warmup step 10") === good
         bad = (sky = (σa = 1.0, σd = Inf, ρa = (2.0, NaN), a = [1.0 -Inf; 0.0 1.0]), instrument = (lg = [0.1, 0.2],))
-        @test BlackBoxComrade._nonfinite_paths(bad) == [".sky.σd = Inf", ".sky.ρa[2] = NaN", ".sky.a (1 of 4 entries, e.g. -Inf)"]
-        @test_throws "the warmup step 140 draw has non-finite parameters: .sky.σd = Inf" BlackBoxComrade._check_finite_draw(bad, "warmup step 140")
+        @test BlackboxComrade._nonfinite_paths(bad) == [".sky.σd = Inf", ".sky.ρa[2] = NaN", ".sky.a (1 of 4 entries, e.g. -Inf)"]
+        @test_throws "the warmup step 140 draw has non-finite parameters: .sky.σd = Inf" BlackboxComrade._check_finite_draw(bad, "warmup step 140")
     end
 
     @testset "NUTS depth estimate from the kernel time" begin
-        dn = BlackBoxComrade._depth_note
+        dn = BlackboxComrade._depth_note
         # 8 s over 10 draws of 1 ms gradients
         @test dn(8.0, 10, 1.0e-3) == " ~lf/step=800 (depth≈9.6)"
         @test dn(8.0, 10, nothing) == ""
@@ -40,12 +40,12 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         @test occursin("Truncated", string(typeof(d)))
         @test parse_dist(Dict("dist" => "DiagonalVonMises", "args" => [0.0, 3.14159])) isa DiagonalVonMises
         @test parse_dist(Dict("dist" => "AngularProjectedNormal", "args" => [0.0, 0.0808])) isa
-            BlackBoxComrade.PT.AngularProjectedNormal
+            BlackboxComrade.PT.AngularProjectedNormal
         @test parse_dist(Dict("dist" => "WrappedNormal", "args" => [0.0, 2.44])) isa
-            BlackBoxComrade.PT.WrappedNormal
+            BlackboxComrade.PT.WrappedNormal
         # a bounded LogNormal is the truncated log-normal
         dln = parse_dist(Dict("dist" => "LogNormal", "args" => [2.66, 0.764], "upper" => 48.0))
-        ref = BlackBoxComrade.Distributions.truncated(LogNormal(2.66, 0.764); upper = 48.0)
+        ref = BlackboxComrade.Distributions.truncated(LogNormal(2.66, 0.764); upper = 48.0)
         @test logpdf(dln, 20.0) - logpdf(ref, 20.0) ≈ logpdf(dln, 3.0) - logpdf(ref, 3.0) atol = 1.0e-12
         @test_throws ErrorException parse_dist(Dict("dist" => "Nonsense", "args" => [1.0]))
         @test_throws ErrorException parse_dist(Dict("args" => [1.0]))               # missing 'dist'
@@ -54,20 +54,20 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
     @testset "scheme registry" begin
         # required params are probed from the @instrument definitions themselves
-        for (k, ctor) in BlackBoxComrade.GAIN_SCHEMES
-            @test !isempty(BlackBoxComrade.required_params(ctor))
+        for (k, ctor) in BlackboxComrade.GAIN_SCHEMES
+            @test !isempty(BlackboxComrade.required_params(ctor))
         end
-        @test BlackBoxComrade.required_params(BlackBoxComrade.LEAKAGE_SCHEMES["none"]) == ()
-        @test BlackBoxComrade.required_params(BlackBoxComrade.GAIN_SCHEMES["gain"]) ==
+        @test BlackboxComrade.required_params(BlackboxComrade.LEAKAGE_SCHEMES["none"]) == ()
+        @test BlackboxComrade.required_params(BlackboxComrade.GAIN_SCHEMES["gain"]) ==
             (:lg1, :gp1, :lgratμ, :lgratσ, :lgrat, :gprat, :gpratμ)
-        @test BlackBoxComrade.required_params(BlackBoxComrade.LEAKAGE_SCHEMES["leakage_simple"]) ==
+        @test BlackboxComrade.required_params(BlackboxComrade.LEAKAGE_SCHEMES["leakage_simple"]) ==
             (:d1re, :d1im, :d2re, :d2im)
-        @test BlackBoxComrade.required_params(BlackBoxComrade.LEAKAGE_SCHEMES["leakage_disk"]) ==
+        @test BlackboxComrade.required_params(BlackboxComrade.LEAKAGE_SCHEMES["leakage_disk"]) ==
             (:d1re, :d1im, :d2re, :d2im)
-        @test BlackBoxComrade.unitdisk(0.0 + 0.0im) == 0
-        @test abs(BlackBoxComrade.unitdisk(0.2 + 0.0im)) ≈ 0.2 / sqrt(1.04)
-        @test all(z -> abs(BlackBoxComrade.unitdisk(z)) < 1, (3.0 + 4.0im, -1.0e3im, 30.0 + 0.0im))
-        @test BlackBoxComrade.required_params(BlackBoxComrade.GAIN_SCHEMES["gain_offsetphase"]) ==
+        @test BlackboxComrade.unitdisk(0.0 + 0.0im) == 0
+        @test abs(BlackboxComrade.unitdisk(0.2 + 0.0im)) ≈ 0.2 / sqrt(1.04)
+        @test all(z -> abs(BlackboxComrade.unitdisk(z)) < 1, (3.0 + 4.0im, -1.0e3im, 30.0 + 0.0im))
+        @test BlackboxComrade.required_params(BlackboxComrade.GAIN_SCHEMES["gain_offsetphase"]) ==
             (:lg1, :gp1μ, :gp1, :lgratμ, :lgrat, :gpratμ, :gprat)
     end
 
@@ -85,7 +85,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
     end
 
     @testset "self-calibrated station phase" begin
-        @test BlackBoxComrade.required_params(BlackBoxComrade.GAIN_SCHEMES["gain_selfcal"]) ==
+        @test BlackboxComrade.required_params(BlackboxComrade.GAIN_SCHEMES["gain_selfcal"]) ==
             (:lg1, :lgratμ, :lgrat, :gpratμ, :gprat)
         cfg = exconfig("instrument_mixed.toml")
         cfg["gain"]["scheme"] = "gain_selfcal"
@@ -98,7 +98,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
     @testset "iid first-stamp pin (init)" begin
         vm = Dict{String, Any}("dist" => "DiagonalVonMises", "args" => [0.0, 3.14159])
-        sp = BlackBoxComrade._site_prior(
+        sp = BlackboxComrade._site_prior(
             Dict{String, Any}(
                 "seg" => "integ", "dist" => vm,
                 "init" => Dict{String, Any}("kind" => "fixed", "value" => 0.0),
@@ -108,12 +108,12 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         @test sp.init == FixedInit(0.0)
         # no init -> nothing (the default, back-compatible path)
         @test isnothing(
-            BlackBoxComrade._site_prior(
+            BlackboxComrade._site_prior(
                 Dict{String, Any}("seg" => "integ", "dist" => vm), "test"
             ).init
         )
         # only a fixed pin is meaningful for iid
-        @test_throws ErrorException BlackBoxComrade._site_prior(
+        @test_throws ErrorException BlackboxComrade._site_prior(
             Dict{String, Any}(
                 "seg" => "integ", "dist" => vm,
                 "init" => Dict{String, Any}("kind" => "uniform"),
@@ -225,25 +225,25 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
         # refant kinds: Multi names several sites, for a parameter carrying more than one
         # gauge freedom
-        @test BlackBoxComrade._parse_refant(nothing) === NoReference()
-        @test BlackBoxComrade._parse_refant(Dict{String, Any}("kind" => "SEFD", "val" => 0.0)) isa
+        @test BlackboxComrade._parse_refant(nothing) === NoReference()
+        @test BlackboxComrade._parse_refant(Dict{String, Any}("kind" => "SEFD", "val" => 0.0)) isa
             SEFDReference
-        @test BlackBoxComrade._parse_refant(
+        @test BlackboxComrade._parse_refant(
             Dict{String, Any}("kind" => "Single", "site" => "AA", "val" => 0.0)
         ) isa SingleReference
-        rm = BlackBoxComrade._parse_refant(
+        rm = BlackboxComrade._parse_refant(
             Dict{String, Any}("kind" => "Multi", "sites" => ["AA", "LM"], "val" => 0.0)
         )
         @test rm isa MultiReference
         @test rm.sites == [:AA, :LM]
         @test rm.value == 0.0
-        @test_throws "requires a 'sites' list" BlackBoxComrade._parse_refant(
+        @test_throws "requires a 'sites' list" BlackboxComrade._parse_refant(
             Dict{String, Any}("kind" => "Multi")
         )
-        @test_throws "'sites' to be a list" BlackBoxComrade._parse_refant(
+        @test_throws "'sites' to be a list" BlackboxComrade._parse_refant(
             Dict{String, Any}("kind" => "Multi", "sites" => "AA")
         )
-        @test_throws "None, SEFD, Single, Multi" BlackBoxComrade._parse_refant(
+        @test_throws "None, SEFD, Single, Multi" BlackboxComrade._parse_refant(
             Dict{String, Any}("kind" => "Manny", "sites" => ["AA"])
         )
         cfgm = exconfig("instrument_mixed.toml")
@@ -308,12 +308,12 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         imv = build_instrument_config(cfgv)
         @test imv isa InstrumentModel
         let d = imv.prior.gprat.default_dist
-            @test d.process isa BlackBoxComrade.Comrade.VonMisesProcess
-            @test d.param isa BlackBoxComrade.Comrade.NonCentered
+            @test d.process isa BlackboxComrade.Comrade.VonMisesProcess
+            @test d.param isa BlackboxComrade.Comrade.NonCentered
         end
         cfgv["priors"]["gprat"]["centered"] = true
         @test build_instrument_config(cfgv).prior.gprat.default_dist.param isa
-            BlackBoxComrade.Comrade.Centered
+            BlackboxComrade.Comrade.Centered
         # ... while the shortest-arc process rejects the non-centered shorthand
         cfgv["priors"]["gprat"]["centered"] = false
         cfgv["priors"]["gprat"]["process"]["kind"] = "wou"
@@ -396,8 +396,8 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         @test flags.corr_polbasis[2] == (; site = :LM, mapping = Pair{Any, Any}[XPol() => LPol(), YPol() => RPol()])
         @test flags.corr_polbasis[3] == (; site = :HAY, mapping = Pair{Any, Any}[RPol() => YPol(), LPol() => XPol()])
         # `corpol` (the per-feed relabeler) is internal; only `corr_polbasis` is exported
-        @test BlackBoxComrade.corpol(RPol(), flags.corr_polbasis[1].mapping) == YPol()
-        @test_throws ErrorException BlackBoxComrade.corpol(XPol(), flags.corr_polbasis[1].mapping)
+        @test BlackboxComrade.corpol(RPol(), flags.corr_polbasis[1].mapping) == YPol()
+        @test_throws ErrorException BlackboxComrade.corpol(XPol(), flags.corr_polbasis[1].mapping)
         @test_throws ErrorException parse_flagtable(
             Dict(
                 "corr_polbasis" => Any[
@@ -409,16 +409,16 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
     @testset "restart resumes only a started sampler" begin
         out = mktempdir()
-        @test !BlackBoxComrade._resume_sampler(out, false)
-        @test !BlackBoxComrade._resume_sampler(out, true)
-        @test !BlackBoxComrade._resume_sampler(joinpath(out, "missing"), true)
+        @test !BlackboxComrade._resume_sampler(out, false)
+        @test !BlackboxComrade._resume_sampler(out, true)
+        @test !BlackboxComrade._resume_sampler(joinpath(out, "missing"), true)
         touch(joinpath(out, "gradient_time.jls"))
-        @test !BlackBoxComrade._resume_sampler(out, true)
+        @test !BlackboxComrade._resume_sampler(out, true)
         mkpath(joinpath(out, "samples")); touch(joinpath(out, "samples", "output_scan_1.jls"))
-        @test_throws "holds samples but no transport.jls" BlackBoxComrade._resume_sampler(out, true)
+        @test_throws "holds samples but no transport.jls" BlackboxComrade._resume_sampler(out, true)
         touch(joinpath(out, "transport.jls"))
-        @test BlackBoxComrade._resume_sampler(out, true)
-        @test !BlackBoxComrade._resume_sampler(out, false)
+        @test BlackboxComrade._resume_sampler(out, true)
+        @test !BlackboxComrade._resume_sampler(out, false)
     end
 
     @testset "fitting config" begin
@@ -472,25 +472,19 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
             params = ["a"]
             [[sampler.moves]]
             kind = "rho_field"
-            [[sampler.moves]]
-            kind = "pnc_field"
-            [[sampler.moves]]
-            kind = "pnc_orbit"
-            params = ["b"]
             [run]
             use_reactant = true
             """
         )
-        @test [m.kind for m in build_fitting_config(toml).moves] == ["field_scale", "rho_field", "pnc_field", "pnc_orbit"]
-        @test build_fitting_config(toml).diagonal == "none"
-        toml["sampler"]["diagonal"] = "nutpie"
-        @test build_fitting_config(toml).diagonal == "nutpie"
-        toml["sampler"]["diagonal"] = "welford"
-        @test_throws "sampler.diagonal must be \"none\" or \"nutpie\"" build_fitting_config(toml)
-        toml["sampler"]["diagonal"] = "nutpie"
-        toml["run"]["use_reactant"] = false
-        delete!(toml["sampler"], "moves")
-        @test_throws "sampler.diagonal needs the Reactant sampler" build_fitting_config(toml)
+        @test [m.kind for m in build_fitting_config(toml).moves] == ["field_scale", "rho_field"]
+        for key in ("diagonal", "adapt_mass_matrix")
+            c = deepcopy(toml)
+            c["sampler"][key] = true
+            @test_throws "unknown key(s) [\"$key\"] in [sampler]" build_fitting_config(c)
+        end
+        @test_throws "unknown key(s) [\"precondition\"]" build_fitting_config(
+            merge(toml, Dict("precondition" => Dict{String, Any}("refit_schedule" => "stan")))
+        )
         for (moves, msg) in (
                 (["flux_gain", "field_scale"], "sampler.moves must be [[sampler.moves]] tables"),
                 ("flux_gain", "sampler.moves must be [[sampler.moves]] tables"),
@@ -516,19 +510,35 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         @test_throws "set `rounds` in each [[sampler.moves]] table" build_fitting_config(cfg4)
         delete!(cfg4["sampler"], "moves_per_chunk")
         cfg4["run"]["use_reactant"] = false
-        @test_throws "needs the Reactant sampler" build_fitting_config(cfg4)
+        @test_throws "the CPU NUTS sampler does not run moves" build_fitting_config(cfg4)
 
         @test s.latent_space == "flat"
-        @test isnothing(BlackBoxComrade.latent_space(s))
+        @test isnothing(BlackboxComrade.latent_space(s))
         cfg5 = exconfig("fitting.toml")
         cfg5["run"]["latent_space"] = "stdnormal"
         s5 = build_fitting_config(cfg5)
-        @test BlackBoxComrade.latent_space(s5) isa BlackBoxComrade.PT.StdNormal
+        @test BlackboxComrade.latent_space(s5) isa BlackboxComrade.PT.StdNormal
         cfg5["run"]["use_reactant"] = true
         foreach(k -> delete!(cfg5["sampler"], k), ("target_accept", "init_buffer", "term_buffer"))
         cfg5["run"]["latent_space"] = "cube"
         @test_throws "unknown run.latent_space 'cube'" build_fitting_config(cfg5)
         cfg5["run"]["latent_space"] = "stdnormal"
+
+        cfg5["run"]["warmup_checkpoint"] = 50
+        @test build_fitting_config(cfg5).warmup_checkpoint == 50
+        delete!(cfg5["run"], "warmup_checkpoint")
+        @test isnothing(build_fitting_config(cfg5).warmup_checkpoint)
+
+        @test isnothing(build_fitting_config(cfg5).device)
+        cfg5["run"]["device"] = "cpu"
+        @test build_fitting_config(cfg5).device == "cpu"
+        cfg5["run"]["device"] = "tpu"
+        @test_throws "unknown run.device 'tpu'. Allowed: cpu, gpu" build_fitting_config(cfg5)
+        cfg5["run"]["device"] = "gpu"
+        cfg5["run"]["use_reactant"] = false
+        @test_throws "run.device needs run.use_reactant = true" build_fitting_config(cfg5)
+        cfg5["run"]["use_reactant"] = true
+        delete!(cfg5["run"], "device")
 
         mc = deepcopy(cfg5)
         foreach(k -> delete!(mc["sampler"], k), ("step_size", "max_tree_depth"))
@@ -545,152 +555,41 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         mc["sampler"]["chains"] = 0
         @test_throws "sampler.chains must be at least 1" build_fitting_config(mc)
         mc["sampler"]["chains"] = 2
-        @test_throws "apply to NUTS only" build_fitting_config(merge(mc, Dict("sampler" => merge(mc["sampler"], Dict("step_size" => 0.1)))))
-        @test_throws "[precondition] applies to NUTS only" build_fitting_config(merge(mc, Dict("precondition" => Dict{String, Any}("rank" => 10))))
-        @test_throws "needs run.latent_space = \"stdnormal\"" build_fitting_config(merge(mc, Dict("run" => merge(mc["run"], Dict("latent_space" => "flat")))))
-        @test_throws "needs run.use_reactant = true" build_fitting_config(merge(mc, Dict("run" => merge(mc["run"], Dict("use_reactant" => false)))))
-        @test_throws "sampler.algorithm must be" build_fitting_config(merge(mc, Dict("sampler" => merge(mc["sampler"], Dict("algorithm" => "hmc")))))
-        mc["sampler"]["algorithm"] = "nuts"
-        @test_throws "sampler.chains, sampler.max_step_halvings apply to sampler.algorithm = \"mclmc\" only" build_fitting_config(mc)
+        edited(c, section, edits...) = merge(c, Dict(section => merge(c[section], Dict(edits...))))
+        @test_throws "sampler.step_size applies to sampler.algorithm = \"nuts\" only, not \"mclmc\"" build_fitting_config(edited(mc, "sampler", "step_size" => 0.1))
+        @test_throws "sampler.max_tree_depth applies to sampler.algorithm = \"nuts\" or \"walnuts\" only" build_fitting_config(edited(mc, "sampler", "max_tree_depth" => 8))
+        @test build_fitting_config(edited(mc, "run", "latent_space" => "flat")).latent_space == "flat"
+        @test_throws "needs run.use_reactant = true" build_fitting_config(edited(mc, "run", "use_reactant" => false))
+        @test_throws "run.sample_checkpoint apply to NUTS only" build_fitting_config(edited(mc, "run", "sample_checkpoint" => 10))
+        @test_throws "sampler.algorithm must be" build_fitting_config(edited(mc, "sampler", "algorithm" => "hmc"))
 
-        cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan")
-        @test build_fitting_config(cfg5).precond_refit_schedule == "stan"
-        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).carry === :none
-        cfg5["precondition"]["refit_carry"] = "rescale"
-        ad = BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5))
-        @test ad isa Comrade.FisherLowRank && ad.carry === :rescale
-        cfg5["precondition"]["refit_carry"] = "keep"
-        @test_throws "set precondition.seed_transport" build_fitting_config(cfg5)
-        cfg5["precondition"]["seed_transport"] = "t.jls"
-        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).carry === :keep
-        cfg5["precondition"]["refit_carry"] = "yes"
-        @test_throws "precondition.refit_carry must be" build_fitting_config(cfg5)
-        # a limit on wide directions in Fisher refits
-        cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "max_wide" => 20)
-        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).max_wide == 20
-        delete!(cfg5["precondition"], "max_wide")
-        @test isnothing(BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).max_wide)
-        cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan")
-        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).discard == 0.5
-        cfg5["precondition"]["discard"] = 0.0
-        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).discard == 0.0
-        cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "rank_holdout" => 0.25, "rank_tol" => 0.1)
-        hd = BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5))
-        @test hd.holdout == 0.25 && hd.rank_tol == 0.1
-        cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "rank_tol" => 0.1)
-        @test_throws "rank_tol needs precondition.rank_holdout" build_fitting_config(cfg5)
-        cfg5["precondition"] = Dict{String, Any}("max_wide" => 0)
-        @test_throws "max_wide applies to in-run refits" build_fitting_config(cfg5)
-        cfg5["precondition"] = Dict{String, Any}("rank_holdout" => 0.25)
-        @test_throws "rank_holdout applies to in-run refits" build_fitting_config(cfg5)
-        cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "record_every" => 4)
-        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).record_every == 4
-        delete!(cfg5["precondition"], "record_every")
-        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).record_every ==
-            Comrade.FisherLowRank().record_every
-        cfg5["precondition"] = Dict{String, Any}("record_every" => 4)
-        @test_throws "record_every applies to in-run refits" build_fitting_config(cfg5)
-        cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "stiff_core" => true)
-        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).stiff isa Comrade.StiffCore
-        cfg5["precondition"]["stiff_core"] = false
-        @test isnothing(BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5)).stiff)
-        cfg5["precondition"] = Dict{String, Any}("stiff_core" => true)
-        @test_throws "stiff_core applies to in-run refits" build_fitting_config(cfg5)
-        cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "refit_kind" => "gauss_newton", "rank" => 600, "stiff_core" => true)
-        @test_throws "stiff_core applies to Fisher refits" build_fitting_config(cfg5)
-        cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "stiff_core" => true)
-        cfg5["run"]["use_reactant"] = false
-        @test_throws "stiff_core needs run.use_reactant = true" build_fitting_config(cfg5)
-        cfg5["run"]["use_reactant"] = true
-        cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan")
-        cfg5["run"]["warmup_checkpoint"] = 50
-        @test build_fitting_config(cfg5).warmup_checkpoint == 50
-        delete!(cfg5["run"], "warmup_checkpoint")
-        @test isnothing(build_fitting_config(cfg5).warmup_checkpoint)
-        cfg5["precondition"] = Dict{String, Any}(
-            "refit_schedule" => "stan", "refit_kind" => "gauss_newton", "rank" => 600, "max_wide" => 0
-        )
-        @test_throws "max_wide applies to Fisher refits" build_fitting_config(cfg5)
-        # fixed directions for Fisher refits
-        fixedpath = joinpath(mktempdir(), "fixed.jls")
-        BlackBoxComrade.Serialization.serialize(fixedpath, (; directions = [1.0 0.0; 0.0 1.0; 0.0 0.0], sd = [3.0, 2.0]))
-        cfg5["precondition"] = Dict{String, Any}("refit_schedule" => "stan", "fixed_directions" => fixedpath)
-        fad = BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5))
-        @test fad.fixed == ([1.0 0.0; 0.0 1.0; 0.0 0.0], [3.0, 2.0])
-        cfg5["precondition"]["refit_carry"] = "rescale"
-        @test_throws "fixed_directions needs refit_carry = \"none\"" build_fitting_config(cfg5)
-        delete!(cfg5["precondition"], "refit_carry")
-        BlackBoxComrade.Serialization.serialize(fixedpath, [1.0, 0.0])
-        @test_throws "must hold a NamedTuple (; directions, sd)" BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5))
-        cfg5["precondition"] = Dict{String, Any}(
-            "refit_schedule" => "stan", "refit_kind" => "gauss_newton", "rank" => 600, "fixed_directions" => fixedpath
-        )
-        @test_throws "fixed_directions applies to Fisher refits" build_fitting_config(cfg5)
-        # Gauss–Newton refits
-        cfg5["precondition"] = Dict{String, Any}(
-            "refit_schedule" => "stan", "refit_kind" => "gauss_newton", "rank" => 600, "threshold" => 50.0
-        )
-        sg = build_fitting_config(cfg5)
-        @test (sg.precond_refit_kind, sg.precond_rank, sg.precond_threshold, sg.precond_oversample) == ("gauss_newton", 600, 50.0, 10)
-        H(x, W) = W
-        ga = BlackBoxComrade._metric_adaptor(sg, H)
-        @test ga isa Comrade.GaussNewtonLowRank && ga.curvature === H && ga.probes_per_draw == 610 && ga.schedule === :stan
-        cfg5["precondition"]["probes_per_draw"] = 70
-        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5), H).probes_per_draw == 70
-        @test build_fitting_config(cfg5).precond_band_limit == 3.0
-        @test BlackBoxComrade._metric_adaptor(build_fitting_config(cfg5), H; rows = [1, 4, 9]).rows == [1, 4, 9]
-        cfg5["precondition"]["band_limit"] = Inf
-        @test build_fitting_config(cfg5).precond_band_limit == Inf
-        cfg5["precondition"]["band_limit"] = 0.0
-        @test_throws "band_limit must be a positive multiple" build_fitting_config(cfg5)
-        delete!(cfg5["precondition"], "band_limit")
-        @test_throws "need a curvature function" BlackBoxComrade._metric_adaptor(sg)
-        @test isempty(ga.residual_at)
-        cr = deepcopy(cfg5)
-        merge!(cr["precondition"], Dict("residual_at" => [0.8], "residual_draws" => 20, "residual_steps" => 20, "residual_directions" => 8, "residual_threshold" => 6.0))
-        sr = build_fitting_config(cr)
-        @test (sr.precond_residual_at, sr.precond_residual_draws, sr.precond_residual_steps, sr.precond_residual_directions, sr.precond_residual_threshold) == ([0.8], 20, 20, 8, 6.0)
-        gr = BlackBoxComrade._metric_adaptor(sr, H)
-        @test (gr.residual_at, gr.residual_draws, gr.residual_steps, gr.residual_directions, gr.residual_threshold) == ([0.8], 20, 20, 8, 6.0)
-        @test isnothing(gr.rescale)
-        merge!(cr["precondition"], Dict("rescale" => true, "rescale_n0" => 2.0, "rescale_bound" => 50.0))
-        gs = BlackBoxComrade._metric_adaptor(build_fitting_config(cr), H)
-        @test (gs.rescale.n0, gs.rescale.bound) == (2.0, 50.0)
-        cr["precondition"]["residual_directions"] = 21
-        @test_throws "residual_directions must lie in 1:residual_steps" BlackBoxComrade._metric_adaptor(build_fitting_config(cr), H)
-        for (edit, msg) in (
-                (c -> (c["precondition"]["residual_at"] = [0.8]; delete!(c["precondition"], "refit_kind")), "residual_at apply to refit_kind = \"gauss_newton\" only"),
-                (c -> c["precondition"]["refit_kind"] = "hessian", "precondition.refit_kind must be"),
-                (c -> delete!(c["precondition"], "rank"), "needs precondition.rank"),
-                (c -> delete!(c["precondition"], "refit_schedule"), "needs refit_schedule or refit_at"),
-                (c -> c["precondition"]["refit_carry"] = "rescale", "precondition.refit_carry applies to Fisher refits"),
-                (c -> c["precondition"]["pilot"] = "run", "precondition.pilot fits a Fisher transform"),
-                (c -> c["run"]["latent_space"] = "flat", "needs run.latent_space = \"stdnormal\""),
-                (c -> c["run"]["use_reactant"] = false, "needs run.use_reactant = true"),
-                (c -> delete!(c["precondition"], "refit_kind"), "precondition.threshold, probes_per_draw apply to refit_kind = \"gauss_newton\" only"),
-            )
-            c = deepcopy(cfg5)
-            edit(c)
-            @test_throws msg build_fitting_config(c)
-        end
-        # Gauss–Newton refits on a basis built from the source support
-        cs = deepcopy(cfg5)
-        cs["precondition"]["refit_kind"] = "gauss_newton_support"
-        cs["precondition"]["support_cut"] = 3.0e-3
-        ss = build_fitting_config(cs)
-        @test (ss.precond_refit_kind, ss.precond_support_cut) == ("gauss_newton_support", 3.0e-3)
-        Bf(x) = ones(length(x), 1)
-        @test BlackBoxComrade._metric_adaptor(ss, H; basis = Bf).basis === Bf
-        for (edit, msg) in (
-                (c -> c["precondition"]["support_cut"] = 1.5, "support_cut must lie in (0, 1)"),
-                (c -> c["precondition"]["band_limit"] = 2.0, "sets its own basis"),
-                (c -> c["precondition"]["refit_kind"] = "gauss_newton", "support_cut applies to refit_kind = \"gauss_newton_support\" only"),
-            )
-            c = deepcopy(cs)
-            edit(c)
-            @test_throws msg build_fitting_config(c)
-        end
-        delete!(cfg5, "precondition")
+        wn = deepcopy(mc)
+        wn["sampler"]["algorithm"] = "walnuts"
+        foreach(k -> delete!(wn["sampler"], k), ("max_step_halvings", "chunk_size"))
+        sw = build_fitting_config(wn)
+        @test (sw.algorithm, sw.chains, sw.chunk_size, sw.max_tree_depth) == ("walnuts", 2, 10, 10)
+        wnd = deepcopy(wn)
+        foreach(k -> delete!(wnd["sampler"], k), ("nadapt", "nsample"))
+        @test (build_fitting_config(wnd).nadapt, build_fitting_config(wnd).nsample) == (1_000, 1_000)
+        @test build_fitting_config(edited(wn, "sampler", "max_tree_depth" => 8)).max_tree_depth == 8
+        @test build_fitting_config(edited(wn, "sampler", "chunk_size" => 20, "nsample" => 100)).chunk_size == 20
+        @test_throws "sampler.nsample = 105 must be a multiple of sampler.chunk_size = 10" build_fitting_config(edited(wn, "sampler", "nsample" => 105))
+        @test_throws "sampler.chunk_size must be at least 1" build_fitting_config(edited(wn, "sampler", "chunk_size" => 0))
+        @test_throws "sampler.max_step_halvings applies to sampler.algorithm = \"mclmc\" only, not \"walnuts\"" build_fitting_config(edited(wn, "sampler", "max_step_halvings" => 2))
+        @test_throws "sampler.step_size applies to sampler.algorithm = \"nuts\" only" build_fitting_config(edited(wn, "sampler", "step_size" => 0.1))
+        @test_throws "sampler.algorithm = \"walnuts\" needs run.use_reactant = true" build_fitting_config(edited(wn, "run", "use_reactant" => false))
+        @test build_fitting_config(edited(wn, "run", "latent_space" => "flat")).latent_space == "flat"
+        @test_throws "run.warmup_checkpoint apply to NUTS only" build_fitting_config(edited(wn, "run", "warmup_checkpoint" => 10))
+        @test BlackboxComrade.kinetic_samplers(sw) == (BlackboxComrade.KineticSamplers.WALNUTS(), BlackboxComrade.KineticSamplers.WALNUTS())
+        mcl, mclw = BlackboxComrade.kinetic_samplers(build_fitting_config(mc))
+        @test (mcl.max_step_halvings, mclw.max_step_halvings) == (0, 0)
+        @test_throws "is not a KineticSamplers algorithm" BlackboxComrade.kinetic_samplers(build_fitting_config(cfg5))
+
+        mc["sampler"]["algorithm"] = "nuts"
+        @test_throws "sampler.chains applies to sampler.algorithm = \"mclmc\" or \"walnuts\" only, not \"nuts\"" build_fitting_config(mc)
+        delete!(mc["sampler"], "chains")
+        @test_throws "sampler.max_step_halvings applies to sampler.algorithm = \"mclmc\" only, not \"nuts\"" build_fitting_config(mc)
+
         cfg5["sampler"]["moves"] = [Dict{String, Any}("kind" => k) for k in ("phase_sheet", "flux_gain", "mean_field")]
         @test [m.kind for m in build_fitting_config(cfg5).moves] == ["phase_sheet", "flux_gain", "mean_field"]
         cfg5["sampler"]["moves"] = [Dict{String, Any}("kind" => "phase_sheet", "initial_scale" => 0.1)]
@@ -701,45 +600,52 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         @test_throws "unknown key(s) [\"dili\"]" build_fitting_config(cfg6)
     end
 
-    @testset "likelihood-informed subspace" begin
-        BB = BlackBoxComrade
-        rng = Random.Xoshiro(7)
-        n = 60
-        lowrank(λ) = (V = Matrix(qr(randn(rng, n, length(λ))).Q)[:, eachindex(λ)]; (V * Diagonal(λ) * V', V))
-        λ0 = [40.0, 9.0, 3.0, 0.5, 0.05]
-        A, V0 = lowrank(λ0)
-        s = BB.likelihood_subspace(v -> A * v, n; rank = 8, threshold = 0.1, rng)
-        @test s.λ ≈ λ0[1:4] rtol = 1.0e-10
-        @test abs.(s.V' * V0[:, 1:4]) ≈ I atol = 1.0e-8
-        @test s.V' * s.V ≈ I
-        @test length(s) == 4
+    @testset "KineticSamplers blocks and chain directories" begin
+        BB = BlackboxComrade
+        KS = BB.KineticSamplers
+        walnuts, mclmc = KS.WALNUTS(; max_depth = 3), KS.MCLMC()
+        @test BB.block_layout(walnuts, 10).draws == 10 && BB.block_layout(walnuts, 10).move_blocks == BB.WALNUTS_MOVE_BLOCKS
+        @test BB.block_layout(mclmc, 100).draws == 1 && BB.block_layout(mclmc, 100).move_blocks == BB.MCLMC_MOVE_BLOCKS
+        d, n, K = 3, 2, 2
+        trace = (;
+            positions = reshape(collect(1.0:(d * n * K)), d, n, K), logp = [-1.0 -3.0; -2.0 -4.0],
+            num_grads = [7 15; 3 31], depth = [2 3; 1 3], accept_stat = [0.9 0.8; 0.7 0.6],
+            leaf_failed = [false true; false false],
+        )
+        draws = BB.block_draws(walnuts, nothing, trace, 8.0)
+        @test length(draws) == n
+        @test draws[2][1] == trace.positions[:, 2, :]
+        @test draws[2][2][1] == (; logp = -2.0, num_grads = 3, time = 2.0, tree_depth = 1, accept_stat = 0.7, leaf_failed = false)
+        health = [BB.draw_health(walnuts, s) for s in draws[1][2]]
+        @test health == [(; failed_draws = 0, max_depth_draws = 0), (; failed_draws = 1, max_depth_draws = 1)]
+        @test BB._health_text(health) == "failed draws 0 1, max depth draws 0 1"
+        mtrace = (;
+            logp = [-1.0 -3.0; -2.0 -4.0], num_grads = [2 2; 2 2],
+            diverged = [false true; false true], step_halvings = [0 1; 2 0],
+        )
+        mdraws = BB.block_draws(mclmc, (; state = (; θ = [1.0 2.0; 3.0 4.0])), mtrace, 4.0)
+        @test only(mdraws)[2] == [
+            (; logp = -2.0, num_grads = 4, time = 2.0, divergent = 0, halved = 1),
+            (; logp = -4.0, num_grads = 4, time = 2.0, divergent = 2, halved = 1),
+        ]
 
-        @test_throws "raise rank" BB.likelihood_subspace(v -> A * v, n; rank = 2, threshold = 0.1, rng)
-        @test_throws "max_basis_bytes" BB.likelihood_subspace(v -> A * v, n; rank = 8, max_basis_bytes = 100, rng)
-        @test_throws "oversample must be at least 1" BB.likelihood_subspace(v -> A * v, n; rank = 8, oversample = 0, rng)
-        @test_throws "free must be distinct" BB.likelihood_subspace(v -> A * v, n; rank = 8, free = [1, 1], rng)
-
-        # restricted to free coordinates: the eigenpairs of the principal submatrix
-        free = collect(1:2:n)
-        sf = BB.likelihood_subspace(v -> A * v, n; rank = 8, free, threshold = 0.1, rng)
-        Ef = eigen(Symmetric(A[free, free]); sortby = -)
-        @test sf.λ ≈ filter(>=(0.1), Ef.values) rtol = 1.0e-10
-        @test sf.free == free
-
-        # averaged over draws: the eigenpairs of the mean operator
-        B, _ = lowrank([20.0, 2.0, 0.3])
-        avg = BB.averaged_operator((M, v) -> M * v, [A, B])
-        sa = BB.likelihood_subspace(avg, n; rank = 10, threshold = 0.1, rng)
-        Ea = eigen(Symmetric((A + B) / 2); sortby = -)
-        @test sa.λ ≈ filter(>=(0.1), Ea.values) rtol = 1.0e-10
-        @test_throws "at least one draw" BB.averaged_operator((M, v) -> M * v, [])
-
-        path = joinpath(mktempdir(), "subspace.jls")
-        BB.save_subspace(path, sa)
-        sl = BB.load_subspace(path)
-        @test sl.λ == sa.λ && sl.V == sa.V && sl.free == sa.free
-        BB.Serialization.serialize(path, 1.0)
-        @test_throws "not a LikelihoodSubspace" BB.load_subspace(path)
+        out = mktempdir()
+        @test_throws "no chains (chain_1, chain_2, …)" BB.load_kinetic_chains(out)
+        for k in (1, 2)
+            w = BB.ChainDrawWriter(joinpath(out, "chain_$k"))
+            foreach(i -> BB.push_draw!(w, (; x = [k, i]); logp = -i), 1:12)
+            BB.flush_draws!(w)
+        end
+        chain = BB.load_kinetic_chains(out, 1:3:12)
+        @test size(Comrade.postsamples(chain)) == (4, 2)
+        @test Comrade.postsamples(chain)[2, 2].x == [2, 4]
+        @test Comrade.samplerstats(chain)[4, 1].logp == -10
+        @test [x.x for x in BB._last_draws(out)] == [[1, 12], [2, 12]]
+        mkpath(joinpath(out, "chain_3", "samples"))
+        w = BB.ChainDrawWriter(joinpath(out, "chain_3"))
+        BB.push_draw!(w, (; x = [3, 1]); logp = -1)
+        BB.flush_draws!(w)
+        @test_throws "different numbers of draws" BB.load_kinetic_chains(out)
     end
 
     @testset "sky config + grid snapping" begin
@@ -755,14 +661,14 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         skym2, _ = build_sky_config(exconfig("image.toml"))
         @test skym2 isa SkyModel
         # NonCenteredMRF (order 2) wants nx such that nx+1 is a product of small primes
-        nx, ny = BlackBoxComrade.snap_grid_size(NonCenteredMRF(GMRF), 2, 64, 64)
+        nx, ny = BlackboxComrade.snap_grid_size(NonCenteredMRF(GMRF), 2, 64, 64)
         @test (nx == 63) && (ny == 63)
         # GMRF order 1 snaps to a product of small primes
-        @test BlackBoxComrade.snap_grid_size(GMRF, 1, 23, 23) == (24, 24)
+        @test BlackboxComrade.snap_grid_size(GMRF, 1, 23, 23) == (24, 24)
     end
 
     @testset "Gaussian background mean with a fixed FWHM" begin
-        BB = BlackBoxComrade
+        BB = BlackboxComrade
         g = imagepixels(μas2rad(200.0), μas2rad(200.0), 32, 32)
         free = GaussBkgdMean(g, μas2rad(40.0), μas2rad(20.0))
         fixed = FixedGaussBkgdMean(g, μas2rad(40.0))
@@ -782,7 +688,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
     end
 
     @testset "Student-t blob mean" begin
-        BB = BlackBoxComrade
+        BB = BlackboxComrade
         g = imagepixels(μas2rad(200.0), μas2rad(200.0), 64, 64)
         for ν in (1.0, 3.0, 30.0)
             r = BB._tblob_halfwidth(ν)
@@ -801,7 +707,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
     end
 
     @testset "anisotropic power-law mean" begin
-        BB = BlackBoxComrade
+        BB = BlackboxComrade
         g = imagepixels(μas2rad(200.0), μas2rad(200.0), 64, 64)
         rc = μas2rad(10.0)
         env = AnisotropicPowerLawMean(g, rc)
@@ -956,9 +862,9 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         # n ≥ 2 about the data beam in pixels with log-sd 0.7, each truncated to [1, 32] pixels
         skyl, _ = build_sky_config(markovcfg(rho_prior = "lognormal"))
         beam_px = μas2rad(20.0) / step(skyl.grid.X)
-        @test logpdf(skyl.prior.ρa[1], 7.0) ≈ logpdf(BlackBoxComrade.Distributions.truncated(LogNormal(log(16.0), 1.0); lower = 1.0, upper = 32.0), 7.0)
+        @test logpdf(skyl.prior.ρa[1], 7.0) ≈ logpdf(BlackboxComrade.Distributions.truncated(LogNormal(log(16.0), 1.0); lower = 1.0, upper = 32.0), 7.0)
         for n in 2:3
-            @test logpdf(skyl.prior.ρa[n], 7.0) ≈ logpdf(BlackBoxComrade.Distributions.truncated(LogNormal(log(beam_px), 0.7); lower = 1.0, upper = 32.0), 7.0)
+            @test logpdf(skyl.prior.ρa[n], 7.0) ≈ logpdf(BlackboxComrade.Distributions.truncated(LogNormal(log(beam_px), 0.7); lower = 1.0, upper = 32.0), 7.0)
             @test logpdf(skyl.prior.ρa[n], 0.9) == -Inf
             @test logpdf(skyl.prior.ρa[n], 33.0) == -Inf
         end
@@ -966,14 +872,14 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
         # the Stokes-I Markov constructor takes the same option (its field is `ρs`)
         skyi, _ = build_sky_config(markovcfg(polrep = "TotalIntensity", rho_prior = "lognormal"))
-        @test logpdf(skyi.prior.ρs[1], 7.0) ≈ logpdf(BlackBoxComrade.Distributions.truncated(LogNormal(log(16.0), 1.0); lower = 1.0, upper = 32.0), 7.0)
+        @test logpdf(skyi.prior.ρs[1], 7.0) ≈ logpdf(BlackboxComrade.Distributions.truncated(LogNormal(log(16.0), 1.0); lower = 1.0, upper = 32.0), 7.0)
 
         # the flat and StdNormal transports map the whole real line onto [1, 32]
-        for sp in (BlackBoxComrade.PT.TVFlat(), BlackBoxComrade.PT.StdNormal())
-            t = BlackBoxComrade.PT.transport_node(skyl.prior.ρa[2], sp)
-            @test BlackBoxComrade.PT.latent_pfwd(t, [-30.0]) >= 1.0
-            @test BlackBoxComrade.PT.latent_pfwd(t, [30.0]) <= 32.0
-            @test BlackBoxComrade.PT.latent_pfwd(t, BlackBoxComrade.PT.latent_pback(t, 2.5)) ≈ 2.5
+        for sp in (BlackboxComrade.PT.TVFlat(), BlackboxComrade.PT.StdNormal())
+            t = BlackboxComrade.PT.transport_node(skyl.prior.ρa[2], sp)
+            @test BlackboxComrade.PT.latent_pfwd(t, [-30.0]) >= 1.0
+            @test BlackboxComrade.PT.latent_pfwd(t, [30.0]) <= 32.0
+            @test BlackboxComrade.PT.latent_pfwd(t, BlackboxComrade.PT.latent_pback(t, 2.5)) ≈ 2.5
         end
 
         # the model still evaluates at a draw from the log-normal prior
@@ -994,7 +900,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
     end
 
     @testset "Matérn spectrum and prior" begin
-        BB = BlackBoxComrade
+        BB = BlackboxComrade
         function materncfg(; kwargs...)
             cfg = exconfig("image.toml")
             cfg["grid"]["nx"] = 32
@@ -1088,14 +994,14 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
     @testset "data product from polrep" begin
         # Stokes-I sky models fit complex visibilities; polarized models fit coherencies.
-        @test BlackBoxComrade.data_product(TotalIntensity()) === Visibilities
-        @test BlackBoxComrade.data_product(PolExp()) === Coherencies
-        @test BlackBoxComrade.data_product(Poincare()) === Coherencies
+        @test BlackboxComrade.data_product(TotalIntensity()) === Visibilities
+        @test BlackboxComrade.data_product(PolExp()) === Coherencies
+        @test BlackboxComrade.data_product(Poincare()) === Coherencies
         # sky_polrep is the single parse point shared by the sky and data paths.
-        @test BlackBoxComrade.sky_polrep(
+        @test BlackboxComrade.sky_polrep(
             Dict("model" => Dict("polrep" => "TotalIntensity"))
         ) isa TotalIntensity
-        @test BlackBoxComrade.sky_polrep(Dict{String, Any}()) isa PolExp  # default
+        @test BlackboxComrade.sky_polrep(Dict{String, Any}()) isa PolExp  # default
         # dlist is polarized coherencies by construction; TotalIntensity is unsupported and
         # must error (before/independent of touching a real file).
         @test_throws ErrorException build_data_dlist(
@@ -1180,23 +1086,6 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
         end
     end
 
-    @testset "preconditioner config plumbing" begin
-        # The preconditioner itself (transform, Fisher estimator, `fit_preconditioner`)
-        # lives in Comrade and is tested there; this covers the TOML -> kwargs mapping.
-        strat = build_fitting_config(
-            Dict{String, Any}(
-                "precondition" => Dict{String, Any}("pilot" => "/tmp/pilotrun", "rank" => 8),
-            )
-        )
-        @test strat.precond_pilot == "/tmp/pilotrun"
-        @test strat.precond_rank == 8
-        @test strat.precond_nsamples == 2000
-        @test isnothing(build_fitting_config(Dict{String, Any}()).precond_pilot)
-        @test_throws ErrorException build_fitting_config(
-            Dict{String, Any}("precondition" => Dict{String, Any}("minscale" => 2.0))
-        )
-    end
-
     # Integration smoke test — runs only if the workshop test data is present.
     datafile = "/home/ptiede/Harvard University Dropbox/Paul Tiede/CHWorkshop/data/3809/hops_3809_M87.apriori.uvfits"
     arrayfile = "/home/ptiede/Harvard University Dropbox/Paul Tiede/CHWorkshop/data/array.txt"
@@ -1212,7 +1101,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
             post = VLBIPosterior(skym, intm, dcoh; imgdata)
             x0 = prior_sample(Random.default_rng(), post)
             @test isfinite(logdensityof(post, x0))
-            xopt, _ = comrade_opt(post, BlackBoxComrade.Adam(); initial_params = x0, maxiters = 5, g_tol = 0.1)
+            xopt, _ = comrade_opt(post, BlackboxComrade.Adam(); initial_params = x0, maxiters = 5, g_tol = 0.1)
             @test isfinite(logdensityof(post, xopt))
 
             @testset "fix_scales: held optimization and field rescale" begin
@@ -1233,8 +1122,8 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
                 # the CPU optimizer moves everything but the held scales
                 xs = prior_sample(Random.Xoshiro(3), postf)
-                xh, _ = BlackBoxComrade._comrade_opt_held(
-                    postf, BlackBoxComrade.Adam(), held; initial_params = xs,
+                xh, _ = BlackboxComrade._comrade_opt_held(
+                    postf, BlackboxComrade.Adam(), held; initial_params = xs,
                     maxiters = 20, g_tol = 0.1
                 )
                 for (k, v) in held
@@ -1242,7 +1131,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                 end
                 @test xh.sky.σa != xs.sky.σa
                 @test xh.sky.b != xs.sky.b
-                @test logdensityof(postf, xh) > logdensityof(postf, BlackBoxComrade._hold_scales(xs, held))
+                @test logdensityof(postf, xh) > logdensityof(postf, BlackboxComrade._hold_scales(xs, held))
 
                 # rescaling puts every field at unit rms and leaves the image where it was
                 xr = rescale_fields(postf, xh)
@@ -1268,25 +1157,25 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                     fix_scales = [:σb, :σc, :σd]
                 )
                 xt = mktempdir() do d
-                    BlackBoxComrade._optimize_tempered(
+                    BlackboxComrade._optimize_tempered(
                         joinpath(d, "t"), skyf, intm, (dcoh,), imgf, strat,
-                        BlackBoxComrade.Adam(), Random.Xoshiro(4)
+                        BlackboxComrade.Adam(), Random.Xoshiro(4)
                     )
                 end
                 for k in (:a, :b, :c, :d)
                     @test sq(xt.sky[k]) ≈ 1 rtol = 1.0e-12
                 end
                 @test_throws "'σz' is not a scalar sky parameter" mktempdir() do d
-                    BlackBoxComrade._optimize_tempered(
+                    BlackboxComrade._optimize_tempered(
                         joinpath(d, "t"), skyf, intm, (dcoh,), imgf,
                         FittingStrategy(; maxiters = 2, ntrials = 1, fix_scales = [:σz]),
-                        BlackBoxComrade.Adam(), Random.Xoshiro(4)
+                        BlackboxComrade.Adam(), Random.Xoshiro(4)
                     )
                 end
             end
 
             @testset "symmetry moves" begin
-                BB = BlackBoxComrade
+                BB = BlackboxComrade
                 ProbProg = BB.Reactant.ProbProg
                 icfg = exconfig("image.toml")
                 icfg["grid"]["nx"] = 16
@@ -1370,9 +1259,9 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                 # reversal, log-determinant against finite differences and likelihood
                 # invariance at every move; prior stationarity of one move per kind
                 ksmoves = ("flux_gain", "field_scale[a]", "rho_field[a,1]", "mean_field[fwhm]")
-                @testset "check_move: $(Comrade.move_name(m))" for m in ms.moves
+                @testset "check_move: $(Comrade.move_name(m))" for (m, τ) in zip(ms.moves, ms.initial_scale)
                     nprior = Comrade.move_name(m) in ksmoves ? 300 : 0
-                    r = check_move(m, postm, θs; nprior, rng = Random.Xoshiro(21))
+                    r = check_move(m, postm, θs; nprior, τ, rng = Random.Xoshiro(21))
                     @test r.loglikelihood < 1.0e-8 * abs(Comrade.loglikelihood(postm, θs[1]))
                 end
 
@@ -1388,8 +1277,8 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                 # field_scale[a] with its Jacobian dropped
                 fa = ms.moves[2]
                 nojac = Comrade.CompensatedMove(
-                    fa.name, fa.ishift, fa.block, fa.compensate, (vb, x, x′, ctx) -> 0.0, fa.initial_scale,
-                    fa.invariant, fa.context, fa.traceable
+                    fa.name, fa.ishift, fa.block, fa.compensate, (vb, x, x′, ctx) -> 0.0,
+                    fa.likelihood_invariant, fa.context, fa.traceable
                 )
                 @test_throws "reports logdet = 0.0" check_move(nojac, postm, θs[1:1])
 
@@ -1397,20 +1286,16 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                     postm, [MoveSpec(; kind = "rho_field", params = ["b"], rounds = 3, target_accept = 0.3)], θs[1]
                 )
                 @test collect(Comrade.move_name.(sub.moves)) == ["rho_field[b,1]", "rho_field[b,2]"]
-                @test sub.rounds == [3, 3] && sub.target_accept == [0.3, 0.3]
+                @test sub.rounds == [3, 3] && sub.target_accept == [0.3, 0.3] && sub.initial_scale == [0.05, 0.05]
 
-                # The hook through a preconditioner makes the same proposals and decisions on
-                # the host and on the device, and writes its statistics.
+                # The hook makes the same proposals and decisions on the host and on the device,
+                # and writes its statistics.
                 @testset "MoveSet hook, host and device" begin
-                    n = dimension(tpm)
-                    prng = Random.Xoshiro(11)
-                    V = Matrix(qr(randn(prng, n, 3)).Q)[:, 1:3]
-                    pre = LowRankPreconditioner(randn(prng, n), exp.(0.3 .* randn(prng, n)), V, [3.0, 0.5, 1.5])
-                    tph = BB.PT.transport_to(postm, pre)
+                    tph = Comrade.maybe_transport(postm, nothing)
                     postc = BB.ConstructionBase.setproperties(postm, (; admode = nothing))
                     rpost = Comrade.prepare_device(postc, Comrade.ComradeBase.ReactantEx())
-                    tpd = BB.PT.transport_to(rpost, Comrade._device_pre(pre))
-                    z0 = Comrade._affine_inv(pre, Comrade.inverse(tpm, θs[1]))
+                    tpd = Comrade.maybe_transport(rpost, nothing)
+                    z0 = Comrade.inverse(tph, θs[1])
                     info = (; phase = :warmup, step = 10, total = 100)
                     specs = [MoveSpec(; kind, rounds = 2) for kind in kinds]
                     out = tempname()
@@ -1455,7 +1340,6 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                     θg = prior_sample(Random.Xoshiro(1), postg)
                     @test_throws "needs a stationary random-field sky model" build_moves(postg, [MoveSpec(; kind = "rho_field")], θg)
                     @test_throws "needs the PolExp stationary random-field sky model" build_moves(postg, [MoveSpec(; kind = "mean_field")], θg)
-                    @test_throws "move \"pnc_orbit\" needs a stationary random-field sky model" build_moves(postg, [MoveSpec(; kind = "pnc_orbit")], θg)
                 end
 
                 @testset "Matérn sky: spectral-parameter and mean-field moves" begin
@@ -1470,9 +1354,9 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                         "rho_field[c,1]", "rho_field[c,2]", "rho_field[d,1]", "rho_field[d,2]",
                         "mean_field[fwhm]", "mean_field[fb]",
                     ]
-                    @testset "check_move: $(Comrade.move_name(m))" for m in mw.moves
+                    @testset "check_move: $(Comrade.move_name(m))" for (m, τ) in zip(mw.moves, mw.initial_scale)
                         nprior = Comrade.move_name(m) in ("rho_field[a,2]", "mean_field[fwhm]") ? 300 : 0
-                        r = check_move(m, postw, θw; nprior, rng = Random.Xoshiro(21))
+                        r = check_move(m, postw, θw; nprior, τ, rng = Random.Xoshiro(21))
                         @test r.loglikelihood < 1.0e-8 * abs(Comrade.loglikelihood(postw, θw[1]))
                     end
                     tpw = mw.ctx.view.tbase
@@ -1487,107 +1371,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                     end
                 end
 
-                # Moves of a polarization field's spectral parameters that hold the field fixed
-                # at the bright pixels. The flow reverses with the opposite log-determinant,
-                # which matches finite differences. Holding the field at 40 of the 256 pixels,
-                # the orbit draw leaves its target (here the prior) invariant, and the traced
-                # draw is the host one.
-                @testset "Matérn sky: field-holding flow and orbit moves" begin
-                    mcfg = deepcopy(icfg)
-                    mcfg["model"]["order"] = 0
-                    skyw, imgw = build_sky_config(mcfg)
-                    postw = VLBIPosterior(skyw, intg, dcoh; imgdata = imgw)
-                    θw = [prior_sample(Random.Xoshiro(k), postw) for k in 1:2]
-                    pm = build_moves(postw, [MoveSpec(; kind = "pnc_field"), MoveSpec(; kind = "pnc_orbit")], θw[1])
-                    @test collect(Comrade.move_name.(pm.moves)) == [
-                        "pnc_field[b,1]", "pnc_field[b,2]", "pnc_field[c,1]", "pnc_field[c,2]",
-                        "pnc_field[d,1]", "pnc_field[d,2]",
-                        "pnc_orbit[b,1]", "pnc_orbit[b,2]", "pnc_orbit[c,1]", "pnc_orbit[c,2]",
-                    ]
-                    @test all(m -> Comrade.step_kind(m) == Comrade.OrbitStep(32), pm.moves[7:end])
-                    @testset "check_move: $(Comrade.move_name(m))" for m in pm.moves[[1, 4]]
-                        r = check_move(m, postw, θw; rng = Random.Xoshiro(21))
-                        @test r.reversal < 1.0e-10 && r.logdet < 1.0e-6
-                    end
-
-                    tpw = pm.ctx.view.tbase
-                    Iraw = BB._raw_stokes_i(postw.skymodel.metadata, θw[1])
-                    S = CartesianIndices(Iraw)[partialsortperm(vec(Iraw), 1:40; rev = true)]
-                    f = pm.moves[1]
-                    flow = BB.PNCFieldMove(
-                        f.name, f.ishift, f.rpath, f.wcoords, f.σpath, f.ps, f.dk, f.nsub, f.initial_scale,
-                        (; k2 = f.context.k2, pnc_HS = BB._hartley_rows(size(Iraw), S))
-                    )
-                    prior_target(y, _) = Comrade._logprior_latent(tpw, postw, y)
-                    orbit = BB.PNCOrbitMove("orbit", flow, 0.2, 16, prior_target)
-                    ctx = (; view = pm.ctx.view, orbit.context...)
-                    orng = Random.Xoshiro(31)
-                    idx = [flow.ishift, flow.wcoords[1], flow.wcoords[2], flow.wcoords[37]]
-                    nd = 200
-                    nmoved = Ref(0)
-                    moved = map(1:nd) do _
-                        x = Comrade.inverse(tpw, prior_sample(orng, postw))
-                        for _ in 1:2
-                            x′, ld = Comrade.propose(orbit, x, Comrade.draw_step(orbit, orng, NaN), ctx)
-                            if ld > 0
-                                nmoved[] += 1
-                                x = x′
-                            end
-                        end
-                        x[idx]
-                    end
-                    @test nmoved[] > nd
-                    fresh = [Comrade.inverse(tpw, prior_sample(orng, postw))[idx] for _ in 1:nd]
-                    crit = sqrt(-log(1.0e-3 / length(idx) / 2) / 2) * sqrt(2 / nd)
-                    @test all(i -> Comrade._ks_statistic(getindex.(moved, i), getindex.(fresh, i)) <= crit, eachindex(idx))
-
-                    postc = BB.ConstructionBase.setproperties(postw, (; admode = nothing))
-                    rpost = Comrade.prepare_device(postc, Comrade.ComradeBase.ReactantEx())
-                    dctx = (;
-                        view = Comrade.CoordinateView(rpost, Comrade.space(pm.ctx.view)),
-                        k2 = BB.Reactant.to_rarray(flow.context.k2), pnc_HS = BB.Reactant.to_rarray(flow.context.pnc_HS),
-                        pnc_orbit_h = BB.Reactant.to_rarray(orbit.context.pnc_orbit_h),
-                    )
-                    om = BB.PNCOrbitMove("orbit", flow, 0.2, 16, BB._base_logdensity)
-                    x = Comrade.inverse(tpw, θw[2])
-                    xh, ldh = Comrade.propose(om, x, 5.3, ctx)
-                    g = (x, s, c) -> Comrade.propose(om, x, s, c)
-                    xd, ldd = BlackBoxComrade.Reactant.@jit g(BB.Reactant.to_rarray(x), BB.Reactant.ConcreteRNumber(5.3), dctx)
-                    @test Array(xd) ≈ xh rtol = 1.0e-9
-                    @test Float64(ldd) == ldh
-
-                    # The warmup hook holds the fields at the brightest pixels of the mean raw
-                    # Stokes I over the draws since the last refresh, keeping the number held,
-                    # and adapts the orbit steps; sampling leaves both alone.
-                    pf = build_moves(postw, [MoveSpec(; kind = "pnc_field")], θw[1])
-                    @test BB._moves_hook(pf, postw, θw[1], Comrade.FixedMetric(), 100, 10) === pf
-                    hk0 = BB._moves_hook(pm, postw, θw[1], Comrade.FixedMetric(), 100, 10)
-                    @test hk0 isa BB.PNCAdaptation && isempty(hk0.steps) && length(hk0.orbit) == 4
-                    fadapt = Comrade.FisherLowRank(; rank = 2)
-                    hk = BB._moves_hook(pm, postw, θw[1], fadapt, 100, 10)
-                    @test hk isa BB.PNCAdaptation && hk.steps == Comrade.metric_refit_steps(fadapt, 100, 10)
-                    @test_throws "target must lie in (0, 1)" BB.PNCAdaptation(pm, postw, θw[1], Int[]; target = 1.0)
-                    M = length(hk.held)
-                    h0 = copy(pm.ctx.pnc_orbit_h)
-                    @test h0 == fill(0.1, 4)
-                    hook = BB.PNCAdaptation(pm, postw, θw[1], [2])
-                    st = ProbProg.MCMCState(Comrade.inverse(tpw, θw[2]), nothing, nothing, 0.1, nothing, nothing)
-                    seen = zero(Iraw)
-                    for step in 1:2
-                        seen .+= BB._raw_stokes_i(postw.skymodel.metadata, Comrade.transform(tpw, copy(st.position)))
-                        st = hook(st, tpw, (; phase = :warmup, step, total = 10, pre = nothing), Random.Xoshiro(step))
-                    end
-                    want = CartesianIndices(seen)[partialsortperm(vec(seen), 1:M; rev = true)]
-                    @test hook.held == want && hook.n == 0
-                    @test pm.ctx.pnc_HS == BB._hartley_rows(size(seen), want)
-                    h2 = copy(pm.ctx.pnc_orbit_h)
-                    @test h2 != h0 && all(h -> 1.0e-3 <= h <= 1, h2) && hook.calls == 2
-                    st = hook(st, tpw, (; phase = :sampling, step = 1, total = 10, pre = nothing), Random.Xoshiro(3))
-                    @test hook.n == 0 && hook.held == want
-                    @test pm.ctx.pnc_orbit_h == h2 && hook.calls == 2
-                end
-
-                @testset "StdNormal posterior and Gauss–Newton kernels" begin
+                @testset "StdNormal posterior" begin
                     @test_throws "Cannot transport the circular distribution" BB.stdnormal_posterior(postm)
 
                     # the same instrument with every prior exactly transportable to N(0, I):
@@ -1616,9 +1400,6 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
 
                     tps = BB.stdnormal_posterior(posts)
                     n = dimension(tps)
-                    L = BB.latent_layout(tps)
-                    @test last(L.instrument.d2im) == n
-                    @test first(L.sky.a) == 1
 
                     θd = [prior_sample(Random.Xoshiro(k), posts) for k in 1:2]
                     us = [Comrade.inverse(tps, θ) for θ in θd]
@@ -1632,7 +1413,7 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                     # a start point whose latent is not finite fails before sampling
                     @test BB.check_start(posts, BB.PT.StdNormal(), θd[1]) ≈ logdensityof(tps, us[1])
                     θ1 = θd[1]
-                    θbad = BlackBoxComrade.@set θ1.sky.mean.fwhm = 0.0
+                    θbad = BlackboxComrade.@set θ1.sky.mean.fwhm = 0.0
                     @test_throws "non-finite latent coordinates in sky.mean.fwhm" BB.check_start(posts, BB.PT.StdNormal(), θbad)
 
                     # real-line phase chains: the start re-wrap and the ±2π sheet move
@@ -1657,9 +1438,9 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                     hnames = filter(startswith("chain_hyper"), Comrade.move_name.(sms.moves))
                     @test "chain_hyper[lg1.σ]" in hnames && "chain_hyper[lg1.τ]" in hnames
                     @test all(sms.free)
-                    @testset "check_move (StdNormal): $(Comrade.move_name(m))" for m in sms.moves
+                    @testset "check_move (StdNormal): $(Comrade.move_name(m))" for (m, τ) in zip(sms.moves, sms.initial_scale)
                         nprior = Comrade.move_name(m) in ("phase_sheet", "chain_hyper[lg1.σ]", ksmoves...) ? 200 : 0
-                        check_move(m, posts, θd; space = std, nprior, rng = Random.Xoshiro(22))
+                        check_move(m, posts, θd; space = std, nprior, τ, rng = Random.Xoshiro(22))
                     end
                     # a sheet move shifts one path by 2π from its start point up to the next fixed point
                     sheet = sms.moves[1]
@@ -1670,96 +1451,6 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
                     moved = findall(>(1.0e-9) ∘ abs, d)
                     @test !isempty(moved) && all(≈(2π; atol = 1.0e-9), d[moved])
                     @test Ip[free[2]] in moved && issubset(moved, Ip)
-
-                    rm = BB.ResidualMap(posts)
-                    Φ = [sum(abs2, BB.whitened_residuals(rm, tps, u)) / 2 for u in us]
-                    @test Φ[1] - Φ[2] ≈ ll(θd[2]) - ll(θd[1]) rtol = 1.0e-10
-
-                    M = Tuple(copy.(rm.measurement))
-                    N = Tuple(copy.(rm.noise))
-                    M[2][3] = NaN
-                    N[4][5] = Inf
-                    @test length(BB.ResidualMap(M, N)) == length(rm) - 4
-                    N[1][1] = 0.0
-                    @test_throws "non-positive noise" BB.ResidualMap(M, N)
-
-                    k = BB.GaussNewtonKernels(posts)
-                    prng = Random.Xoshiro(21)
-                    u, v, w = us[1], randn(prng, n), randn(prng, n)
-                    h = 1.0e-5
-                    fd(f, v) = (f(u .+ h .* v) .- f(u .- h .* v)) ./ (2h)
-                    resid(u) = BB.whitened_residuals(rm, tps, u)
-                    Jv, Jw = fd(resid, v), fd(resid, w)
-
-                    GNv, GNw = Array(BB.gauss_newton(k, u, v)), Array(BB.gauss_newton(k, u, w))
-                    @test dot(w, GNv) ≈ dot(Jw, Jv) rtol = 1.0e-6
-                    @test dot(w, GNv) ≈ dot(GNw, v) rtol = 1.0e-10
-
-                    compiled = copy(k.compiled)
-                    BB.gauss_newton(k, us[2], w)
-                    @test k.compiled == compiled
-
-                    # the subspace of the draw-averaged Gauss–Newton operator against its
-                    # dense eigendecomposition
-                    Id = Matrix{Float64}(I, n, n)
-                    H = sum(u -> reduce(hcat, (Array(BB.gauss_newton(k, u, Id[:, j])) for j in 1:n)), us) ./ length(us)
-                    Ed = eigen(Symmetric(H); sortby = -)
-                    thr = (Ed.values[6] + Ed.values[7]) / 2
-                    sub = BB.gauss_newton_subspace(k, us; rank = 10, threshold = thr, power = 4, rng = Random.Xoshiro(5))
-                    @test length(sub) == 6
-                    @test sub.λ ≈ Ed.values[1:6] rtol = 1.0e-6
-
-                    # the curvature function of the Gauss–Newton adaptor acts in the latent
-                    # coordinates the sampler's StdNormal space uses, column by column
-                    tsamp = Comrade.transport_to(posts, BB.PT.StdNormal())
-                    @test Comrade.transform(tsamp, u) == Comrade.transform(tps, u)
-                    curv = BB.gauss_newton_curvature(k)
-                    @test curv(u, [v w]) ≈ [GNv GNw] rtol = 1.0e-12
-                    # with a complete probe set the sketch is exact
-                    ga = Comrade.GaussNewtonLowRank(curv; rank = n - 4, oversample = 4, threshold = thr, min_draws = 2)
-                    st = Comrade.init_metric_adaptation(ga)
-                    foreach(x -> Comrade.observe_draw!(ga, st, nothing, x, zero(x)), us)
-                    fit = Comrade.metric_refit(ga, st)
-                    @test 1 ./ fit.s .^ 2 .- 1 ≈ Ed.values[1:6] rtol = 1.0e-6
-
-                    # directions confined to the sky-field modes within a band of the data
-                    @test isnothing(BB.gauss_newton_rows(posts, Inf))
-                    @test isnothing(BB.gauss_newton_rows(posts, 1.0e6))
-                    rws = BB.gauss_newton_rows(posts, 0.5)
-                    vs = Comrade.CoordinateView(posts, BB.PT.StdNormal())
-                    fieldc = reduce(vcat, [collect(Comrade.coords(vs, (:sky, X))) for X in (:a, :b, :c, :d)])
-                    @test issorted(rws) && issubset(setdiff(1:n, fieldc), rws)
-                    mdp = posts.skymodel.metadata
-                    km = hypot.(mdp.base.plan.kx, mdp.base.plan.ky') ./ (π * abs(step(mdp.grid.X)))
-                    umaxp = maximum(hypot.(Comrade.datatable(posts.data[1]).baseline.U, Comrade.datatable(posts.data[1]).baseline.V))
-                    ca = collect(Comrade.coords(vs, (:sky, :a)))
-                    @test intersect(rws, ca) == ca[vec(km .<= 0.5 * umaxp)]
-                    @test 0 < count(in(rws), ca) < length(ca)
-
-                    # the support basis: orthonormal columns, and the range of the Gauss–Newton
-                    # operator at the draw lies nearly in their span, more so as the support grows
-                    Hu = reduce(hcat, (Array(BB.gauss_newton(k, us[1], Id[:, j])) for j in 1:n))
-                    function outside(c)
-                        Ω = BB.support_basis(posts, c)(us[1])
-                        return Ω, norm(Hu .- Ω * (Ω' * Hu)) / norm(Hu)
-                    end
-                    Ωl, rl = outside(1.0e-1)
-                    Ωs, rs = outside(1.0e-3)
-                    @test Ωs' * Ωs ≈ Matrix(I, size(Ωs, 2), size(Ωs, 2)) atol = 1.0e-10
-                    @test size(Ωl, 2) < size(Ωs, 2) <= n
-                    @test rs < rl && rs < 0.1
-                    # the adaptor with that basis fits the operator's leading eigenvalues
-                    gs = Comrade.GaussNewtonLowRank(curv; rank = n, threshold = thr, min_draws = 2, basis = BB.support_basis(posts, 1.0e-3))
-                    sts = Comrade.init_metric_adaptation(gs)
-                    foreach(x -> Comrade.observe_draw!(gs, sts, nothing, x, zero(x)), us)
-                    fits = Comrade.metric_refit(gs, sts)
-                    @test !isnothing(fits) && length(fits.s) >= 1
-                    @test 1 / fits.s[1]^2 - 1 ≈ Ed.values[1] rtol = 0.05
-                    gr = Comrade.GaussNewtonLowRank(curv; rank = 6, oversample = 4, threshold = thr, min_draws = 2, rows = rws)
-                    sr = Comrade.init_metric_adaptation(gr)
-                    foreach(x -> Comrade.observe_draw!(gr, sr, nothing, x, zero(x)), us)
-                    fr = Comrade.metric_refit(gr, sr)
-                    @test fr.V isa Comrade.RowSupportedMatrix && fr.V.rows == rws
                 end
             end
         else

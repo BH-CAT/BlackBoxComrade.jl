@@ -1,14 +1,14 @@
 ```@meta
-CurrentModule = BlackBoxComrade
+CurrentModule = BlackboxComrade
 ```
 
-# BlackBoxComrade
+# BlackboxComrade
 
-Documentation for [BlackBoxComrade](https://github.com/BH-CAT/BlackBoxComrade.jl).
+Documentation for [BlackboxComrade](https://github.com/BH-CAT/BlackboxComrade.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [BlackBoxComrade]
+Modules = [BlackboxComrade]
 ```
