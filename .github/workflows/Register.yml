@@ -1,16 +1,89 @@
 name: Register Package
+# Registers the version in Project.toml in BH-CAT/BHCATRegistry, then tags and releases it.
+# A "/register" comment from someone with write access starts it: on a commit it registers
+# that commit, on an issue or pull request the head of the default branch.
 on:
+  commit_comment:
+    types: [created]
+  issue_comment:
+    types: [created]
   workflow_dispatch:
-    inputs:
-      version:
-        description: Version to register or component to bump
-        required: true
 jobs:
   register:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.comment.body, '/register')
     runs-on: ubuntu-latest
     permissions:
-        contents: write
+      contents: write
+      issues: write
+      pull-requests: write
     steps:
-      - uses: julia-actions/RegisterAction@latest
+      - name: Check that the commenter can write to the repository
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+        run: |
+          permission=$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$COMMENTER/permission" --jq .permission)
+          case "$permission" in
+            admin|maintain|write) ;;
+            *) echo "::error::$COMMENTER has $permission access; registering needs write access"; exit 1 ;;
+          esac
+      - name: Choose the commit
+        id: commit
+        env:
+          COMMENTED_COMMIT: ${{ github.event.comment.commit_id }}
+        run: echo "sha=${COMMENTED_COMMIT:-$GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ steps.commit.outputs.sha }}
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+      - name: Give git access to the registry
+        run: |
+          token=$(printf '%s' "$REGISTRY_TOKEN" | tr -d '[:space:]')
+          test -n "$token" || { echo "::error::secret REGISTRY_TOKEN is not set"; exit 1; }
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global url."https://x-access-token:${token}@github.com/BH-CAT/BHCATRegistry".insteadOf "https://github.com/BH-CAT/BHCATRegistry"
+        env:
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+      - name: Register
+        id: register
+        env:
+          JULIA_PKG_USE_CLI_GIT: 'true'
+        run: |
+          echo "version=$(julia -e 'import TOML; print(TOML.parsefile("Project.toml")["version"])')" >> "$GITHUB_OUTPUT"
+          julia --project=@register -e '
+            using Pkg
+            Pkg.Registry.add("General")
+            Pkg.Registry.add(url = "https://github.com/BH-CAT/BHCATRegistry.git")
+            Pkg.add("LocalRegistry")
+            using LocalRegistry
+            register(pwd(); registry = "BHCATRegistry",
+                     repo = "https://github.com/BH-CAT/BlackboxComrade.jl.git")'
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.register.outputs.version }}" \
+            --target "${{ steps.commit.outputs.sha }}" --generate-notes
+      - name: Reply to the comment
+        if: always() && github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATUS: ${{ job.status }}
+          VERSION: ${{ steps.register.outputs.version }}
+          COMMIT: ${{ steps.commit.outputs.sha }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          if [ "$STATUS" = success ]; then
+            body="Registered v$VERSION in BHCATRegistry: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/v$VERSION"
+          else
+            body="Registration failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          fi
+          if [ -n "$ISSUE" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" -f body="$body"
+          else
+            gh api "repos/$GITHUB_REPOSITORY/commits/$COMMIT/comments" -f body="$body"
+          fi
