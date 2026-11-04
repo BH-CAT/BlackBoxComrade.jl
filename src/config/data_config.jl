@@ -26,7 +26,9 @@ default). Sections:
   and `"cwd"` leaves them relative to the launch directory; absolute paths are used as-is
   either way). `array` supplies feed-rotation/mount overrides; omit it for uvfits to keep the
   data file's own mount metadata. dlist requires it (it builds the antenna table from it).
-- `[data]` — `format` (`"auto"`/`"uvfits"`/`"dlist"`), `avg`, `ferr`, `IF` (1-based single
+- `[data]` — `format` (`"auto"`/`"uvfits"`/`"dlist"`), `avg` (`"scan"` or a fixed interval
+  in seconds), `scan_gap` (uvfits with `avg = "scan"`: a gap between records longer than this
+  many seconds starts a new scan; default 20), `ferr`, `IF` (1-based single
   intermediate-frequency selection for a multi-IF UVFITS file; omit it for the frequency-
   averaged band), `keep_trange` (a single `[lo, hi]` UT-hour window the data is restricted
   to at load; `[]` = keep all), `conjugate` (uvfits only; `true` flips the phase-sign
@@ -59,12 +61,13 @@ function build_data_config(
 
     dat = get(cfg, "data", Dict{String, Any}())
     check_config_keys(
-        dat, ("format", "avg", "ferr", "IF", "keep_trange", "conjugate", "ignore_feed_labels"),
+        dat, ("format", "avg", "scan_gap", "ferr", "IF", "keep_trange", "conjugate", "ignore_feed_labels"),
         "[data]"
     )
     fmt = String(get(dat, "format", "auto"))
     fmt = fmt == "auto" ? _infer_format(file) : fmt
     avg = string(get(dat, "avg", "scan"))
+    scan_gap = Float64(get(dat, "scan_gap", 20.0))
     ferr = Float64(get(dat, "ferr", 0.005))
     kt = get(dat, "keep_trange", Float64[])
     keep_trange = isempty(kt) ? nothing : Tuple(Float64.(kt))
@@ -77,12 +80,13 @@ function build_data_config(
     @info "Loading $fmt data: $file"
     if fmt == "uvfits"
         dcoh = build_data_uvfits(
-            file, array; avg, ferr, trange = keep_trange, IF, polrep, conjugate, ignore_feed_labels
+            file, array; avg, scan_gap, ferr, trange = keep_trange, IF, polrep, conjugate, ignore_feed_labels
         )
     elseif fmt == "dlist"
         isnothing(IF) || @warn "data.IF is set but dlist files have no IFs; ignoring."
         conjugate && @warn "data.conjugate is set but only supported for uvfits; ignoring."
         ignore_feed_labels && @warn "data.ignore_feed_labels is set but only applies to uvfits; ignoring."
+        haskey(dat, "scan_gap") && @warn "data.scan_gap is set but dlist files are already scan-averaged; ignoring."
         dcoh = build_data_dlist(file, array; avg, ferr, trange = keep_trange, polrep)
     else
         error("unknown data format '$fmt'. Allowed: uvfits, dlist (or 'auto')")
