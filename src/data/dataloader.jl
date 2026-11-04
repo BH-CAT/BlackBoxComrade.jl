@@ -10,6 +10,7 @@ data_product(::PolRep) = Coherencies
 function build_data_uvfits(
         file::String, array::Union{String, Nothing} = nothing;
         avg = "scan",
+        scan_gap::Real = 20.0,
         ferr::Float64 = 0.005,
         trange = nothing,
         IF = nothing,
@@ -21,8 +22,11 @@ function build_data_uvfits(
     uvd = VLBIFiles.load(VLBIFiles.UVData, file)
     ignore_feed_labels && force_circular_feed_labels!(uvd)
 
+    # `avg = "scan"` averages each scan coherently; a time gap longer than `scan_gap` seconds
+    # between consecutive records starts a new scan.
     if avg == "scan"
-        tavg = VLBI.GapBasedScans()
+        scan_gap > 0 || error("scan_gap must be positive (seconds); got $scan_gap")
+        tavg = VLBI.GapBasedScans(; min_gap = Float64(scan_gap) * VLBIFiles.Unitful.u"s")
     else
         tavg = VLBI.FixedTimeIntervals(parse(Float64, avg) * VLBIFiles.Unitful.u"s")
     end
@@ -42,6 +46,11 @@ function build_data_uvfits(
             frequency_average = isnothing(IF),
         )
     )
+    # Comrade builds the array's scan table with VLBIData's default gap (1 minute) whatever
+    # `time_average` is. Rebuild it with the averaging strategy, so records averaged into
+    # separate scans also get separate scan-segmented instrument parameters (see
+    # ptiede/Comrade.jl#480).
+    avg == "scan" && (dvis = set_scans(dvis, VLBI.scan_intervals(tavg, VLBI.uvtable(uvd))))
     if !isnothing(IF)
         ifs = sort(unique(dvis.config.datatable.Fr))
         (IF isa Integer && 1 <= IF <= length(ifs)) ||
@@ -102,6 +111,28 @@ function conjugate_data(dvis::Comrade.EHTObservationTable{T}) where {T}
     meas = map(adjoint, dvis.measurement)
     noise = map(transpose, dvis.noise)
     return Comrade.EHTObservationTable{T}(meas, noise, dvis.config)
+end
+
+"""
+    set_scans(dvis, intervals) -> dvis
+
+Replace the scan table of `dvis` with `intervals` (DateTime intervals, as returned by
+`VLBIData.scan_intervals`), converted to hours after midnight of the first scan's day, the
+convention of the data's `Ti`. Throws if an averaged time falls outside every new scan.
+"""
+function set_scans(dvis, intervals)
+    start, stop = map(minimum, intervals), map(maximum, intervals)
+    issorted(start) || error("scan intervals are not sorted by start time")
+    midnight = Dates.DateTime(Dates.Date(first(start)))
+    hours(dt) = Dates.value(dt - midnight) / 3.6e6
+    scans = StructArray((; start = map(hours, start), stop = map(hours, stop)))
+    for t in unique(arrayconfig(dvis)[:Ti])
+        any(i -> scans.start[i] <= t <= scans.stop[i], eachindex(scans)) ||
+            error("averaged time $t h lies outside every scan of the rebuilt scan table")
+    end
+    arr = arrayconfig(dvis)
+    newarr = @set arr.scans = scans
+    return @set dvis.config = newarr
 end
 
 """

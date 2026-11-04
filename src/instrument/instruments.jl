@@ -361,6 +361,34 @@ end
 
 unitdisk(z) = z / sqrt(1 + abs2(z))
 
+#     leakage_disk_offsets(; priors)
+#
+# `leakage_disk` with each component of `z` split into a per-station mean and a residual
+# about it, the decomposition the gain ratio uses (lgratμ + lgrat):
+#   d1reμ, d1imμ, d2reμ, d2imμ — the per-station leakage (typically `seg = "track"`);
+#   d1re,  d1im,  d2re,  d2im  — the residual about it (typically a zero-mean stationary OU
+#                                chain with a small σ and a long τ, for slightly variable
+#                                leakage).
+# `D = unitdisk(zμ + z)`, so |D| < 1 as in `leakage_disk`.
+@instrument function leakage_disk_offsets(; priors)
+    return @jones begin
+        d1reμ ~ priors.d1reμ
+        d1imμ ~ priors.d1imμ
+        d2reμ ~ priors.d2reμ
+        d2imμ ~ priors.d2imμ
+        d1re ~ priors.d1re
+        d1im ~ priors.d1im
+        d2re ~ priors.d2re
+        d2im ~ priors.d2im
+        return JonesD(
+            (
+                unitdisk(complex(d1reμ + d1re, d1imμ + d1im)),
+                unitdisk(complex(d2reμ + d2re, d2imμ + d2im)),
+            )
+        )
+    end
+end
+
 #     leakage_hier(; priors)
 #
 # Hierarchical leakage: each feed's real/imaginary parts are given by a mean, a standard
@@ -408,6 +436,7 @@ const LEAKAGE_SCHEMES = Dict{String, Any}(
     "leakage_simple" => leakage_simple,
     "leakage_hier" => leakage_hier,
     "leakage_disk" => leakage_disk,
+    "leakage_disk_offsets" => leakage_disk_offsets,
 )
 
 const SEGMENTATIONS = Dict{String, Any}(

@@ -71,6 +71,36 @@ exconfig(f) = TOML.parsefile(joinpath(EXDIR, f))
             (:lg1, :gp1μ, :gp1, :lgratμ, :lgrat, :gpratμ, :gprat)
     end
 
+    @testset "leakage_disk_offsets" begin
+        @test BlackboxComrade.required_params(BlackboxComrade.LEAKAGE_SCHEMES["leakage_disk_offsets"]) ==
+            (:d1reμ, :d1imμ, :d2reμ, :d2imμ, :d1re, :d1im, :d2re, :d2im)
+        # D = unitdisk(per-station mean + residual), feed by feed
+        x = (d1reμ = 0.1, d1imμ = -0.05, d2reμ = 0.02, d2imμ = 0.0, d1re = 0.01, d1im = 0.0, d2re = -0.02, d2im = 0.03)
+        d1, d2 = BlackboxComrade._leakage_disk_offsets_pmap_1(x)
+        @test d1 ≈ BlackboxComrade.unitdisk(complex(0.11, -0.05))
+        @test d2 ≈ BlackboxComrade.unitdisk(complex(0.0, 0.03))
+
+        # per-station means on the track, a slow zero-mean OU residual about them
+        cfg = exconfig("instrument_mixed.toml")
+        cfg["leakage"]["scheme"] = "leakage_disk_offsets"
+        for n in ("d1re", "d1im", "d2re", "d2im")
+            cfg["priors"][n * "μ"] = cfg["priors"][n]
+            cfg["priors"][n] = Dict{String, Any}(
+                "kind" => "gaussmarkov", "seg" => "scan", "centered" => false,
+                "process" => Dict{String, Any}(
+                    "kind" => "ou",
+                    "sigma" => Dict{String, Any}("dist" => "Exponential", "args" => [0.01]),
+                    "tau" => Dict{String, Any}("dist" => "LogNormal", "args" => [2.3, 0.5]),
+                ),
+            )
+        end
+        intm = assemble_instrument(cfg)
+        @test intm isa InstrumentModel
+        @test all(n -> haskey(intm.prior, n), (:d1reμ, :d1imμ, :d2reμ, :d2imμ, :d1re, :d1im, :d2re, :d2im))
+        delete!(cfg["priors"], "d2imμ")
+        @test_throws ErrorException assemble_instrument(cfg)
+    end
+
     @testset "instrument assembler" begin
         intm = build_instrument_config(exconfig("instrument_mixed.toml"))
         @test intm isa InstrumentModel
